@@ -79,3 +79,31 @@ test('buildTickerReportWithContext uses yahoo providers in default_live', async 
   assert.ok(liveSources.news.includes('yahoo-news'));
   assert.equal(registry.metadataStorage.getHistory('AAPL', 'sentiment').length, 1);
 });
+
+
+test('buildTickerReportWithContext keeps latest available price when provider fetch fails', async () => {
+  const registry = await loadRegistry();
+
+  const okFetch = async (url) => {
+    const u = String(url);
+    if (u.includes('/api/providers/yahoo/quote')) {
+      return new Response(JSON.stringify({ quoteResponse: { result: [{ regularMarketPrice: 150.5 }] } }));
+    }
+    return new Response(JSON.stringify({ news: [{ title: 'AAPL steady update', publisher: 'Financial Times' }] }));
+  };
+
+  const failingFetch = async (url) => {
+    const u = String(url);
+    if (u.includes('/api/providers/yahoo/quote')) {
+      return new Response('{}', { status: 401 });
+    }
+    return new Response('{}', { status: 503 });
+  };
+
+  const first = await registry.buildTickerReportWithContext('AAPL', { now: 1000, contextId: 'default_live' }, okFetch);
+  const second = await registry.buildTickerReportWithContext('AAPL', { now: 2000, contextId: 'default_live' }, failingFetch);
+
+  assert.equal(first.report.currentPrice, 150.5);
+  assert.equal(second.report.currentPrice, 150.5);
+  assert.ok(second.providerWarnings.some((warning) => warning.includes('Price unavailable')));
+});

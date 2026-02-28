@@ -130,6 +130,34 @@ export const defaultWatchlists = async (
     }))
   );
 
+
+const refreshTickerFromContext = async (
+  ticker: Ticker,
+  contextId = 'default_mock',
+  fetchImpl: typeof fetch = fetch
+): Promise<Ticker> => {
+  const refreshed = await buildTicker(ticker.symbol, contextId, fetchImpl);
+  return {
+    ...refreshed,
+    id: ticker.id,
+    alerts: ticker.alerts
+  };
+};
+
+export const hydrateWatchlistsForContext = async (
+  watchlists: Watchlist[],
+  contextId = 'default_mock',
+  fetchImpl: typeof fetch = fetch
+): Promise<Watchlist[]> =>
+  Promise.all(
+    watchlists.map(async (watchlist) => ({
+      ...watchlist,
+      tickers: await Promise.all(
+        watchlist.tickers.map((ticker) => refreshTickerFromContext(ticker, contextId, fetchImpl))
+      )
+    }))
+  );
+
 export const addTicker = async (
   watchlist: Watchlist,
   symbol: string,

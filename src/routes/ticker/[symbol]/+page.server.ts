@@ -40,7 +40,7 @@ export const load: PageServerLoad = async ({ params, url, fetch }) => {
     metadataStorage.setTickerRefreshInterval(symbol, `entry:${selectedEntry.id}`, refreshEntryMs);
   }
 
-  const { report, liveSources } = await buildTickerReportWithContext(
+  const { report, liveSources, providerWarnings } = await buildTickerReportWithContext(
     symbol,
     {
       contextId: context.id,
@@ -61,6 +61,7 @@ export const load: PageServerLoad = async ({ params, url, fetch }) => {
     contexts: analysisContexts.map((item) => ({ id: item.id, name: item.name })),
     report,
     liveSources,
+    providerWarnings,
     cache: {
       globalRefreshMs: metadataStorage.getGlobalRefreshInterval(),
       targetHistory: metadataStorage.getHistory(symbol, 'target-consensus'),

@@ -382,3 +382,6 @@ This removes pricing mock-seeding from trading watchlist constructors and keeps 
 Provider failures no longer silently fall back to mock values in live mode.
 When a ticker bootstrap call cannot retrieve price/news from its active context provider, the app stores provider warnings on that ticker and shows a ⚠️ icon in the dashboard row.
 Clicking the icon opens the warning list so you can inspect current fetch/provider issues.
+
+
+For live contexts, failed provider refreshes now retain the latest successful provider value from cache (or `0` when no successful fetch exists yet), and warnings are surfaced in the UI.

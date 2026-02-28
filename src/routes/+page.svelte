@@ -9,6 +9,7 @@
   import {
     addAlert,
     addTicker,
+    hydrateWatchlistsForContext,
     defaultWatchlists,
     markAllNotificationsRead,
     markNotificationRead,
@@ -86,6 +87,11 @@
         } catch {
           localStorage.removeItem(NOTIFICATION_STORAGE_KEY);
         }
+      }
+
+      if (watchlists.length > 0) {
+        watchlists = await hydrateWatchlistsForContext(watchlists, activeContextId);
+        persist();
       }
 
       handle = setInterval(() => {
@@ -170,8 +176,11 @@
     if (watchlists.length === 0) {
       watchlists = await defaultWatchlists(activeContextId);
       selectedWatchlistId = watchlists[0]?.id ?? '';
-      persist();
+    } else {
+      watchlists = await hydrateWatchlistsForContext(watchlists, activeContextId);
     }
+    expandedWarningsTickerId = '';
+    persist();
   };
 
   const getAlertDraft = (tickerId: string) =>

@@ -76,7 +76,16 @@
     </div>
   </section>
 
-
+  {#if (data.providerWarnings?.length ?? 0) > 0}
+    <section class="panel warning">
+      <h2>Provider warnings</h2>
+      <ul>
+        {#each data.providerWarnings as warning}
+          <li>{warning}</li>
+        {/each}
+      </ul>
+    </section>
+  {/if}
 
   <section class="panel">
     <h2>Metadata cache settings</h2>
@@ -197,5 +206,7 @@
   select,input{width:100%;padding:.45rem;border:1px solid #cbd5e1;border-radius:8px}
   .history{margin:.6rem 0 0;color:#64748b;font-size:.9rem}
   .back{color:#4f46e5;text-decoration:none;font-weight:600}
+  .warning{border-color:#f59e0b;background:#fffbeb}
+  .warning ul{margin:.4rem 0 0;padding-left:1rem;color:#92400e}
   @media (max-width: 780px){.cols,.controls{grid-template-columns:1fr}}
 </style>

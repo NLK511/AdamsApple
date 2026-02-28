@@ -6,7 +6,6 @@ import type { AnalysisContext, EntryPointModel, FundamentalModel, TickerReport }
 import { getAnalysisContext } from './contexts';
 import { buildTargetConsensus, defaultEntryPointModels, defaultFundamentalModels } from './engines';
 import { InMemoryTickerMetadataStorage } from './metadata-storage';
-import { anchorPrice } from './providers/mock-providers';
 
 export const metadataStorage = new InMemoryTickerMetadataStorage();
 
@@ -28,7 +27,7 @@ export const entryPointModels = defaultEntryPointModels;
 
 export const buildTickerReport = (
   symbol: string,
-  currentPrice = anchorPrice(symbol),
+  currentPrice = 0,
   opts?: BuildOptions
 ): TickerReport => {
   const context = getAnalysisContext(opts?.contextId);
@@ -56,7 +55,7 @@ export const buildTickerReport = (
 
 export const buildTickerReportCached = (
   symbol: string,
-  currentPrice = anchorPrice(symbol),
+  currentPrice = 0,
   opts?: BuildOptions
 ): TickerReport => {
   const context = getAnalysisContext(opts?.contextId);
@@ -115,14 +114,40 @@ export const buildTickerReportWithContext = async (
   report: TickerReport;
   context: AnalysisContext;
   liveSources: { market: string[]; news: string[] };
+  providerWarnings: string[];
 }> => {
   const context = getAnalysisContext(opts?.contextId);
   const normalized = symbol.toUpperCase();
   const now = opts?.now ?? Date.now();
+  const providerWarnings: string[] = [];
 
-  const providerPrice = await context.tickerPriceProvider.fetchPrice(normalized, fetchImpl);
-  const currentPrice = providerPrice ?? anchorPrice(normalized);
-  const newsSignals = await context.newsProvider.fetchSignals(normalized, fetchImpl);
+  let providerPrice: number | null = null;
+  try {
+    providerPrice = await context.tickerPriceProvider.fetchPrice(normalized, fetchImpl);
+  } catch (error) {
+    providerWarnings.push(`Price provider error: ${error instanceof Error ? error.message : 'unknown error'}`);
+  }
+
+  if (Number.isFinite(providerPrice)) {
+    metadataStorage.upsert(normalized, 'current-price', providerPrice, now);
+  } else {
+    providerWarnings.push(`Price unavailable from ${context.tickerPriceProvider.id}.`);
+  }
+
+  const latestPrice = metadataStorage.getLatest<number>(normalized, 'current-price')?.value;
+  const currentPrice = Number.isFinite(providerPrice)
+    ? Number((providerPrice as number).toFixed(2))
+    : Number((latestPrice ?? 0).toFixed(2));
+
+  let newsSignals: Array<{ source: 'X' | 'Financial Times'; signal: string; confidence: number }> = [];
+  try {
+    newsSignals = await context.newsProvider.fetchSignals(normalized, fetchImpl);
+  } catch (error) {
+    providerWarnings.push(`News provider error: ${error instanceof Error ? error.message : 'unknown error'}`);
+  }
+  if (newsSignals.length === 0) {
+    providerWarnings.push(`No signals returned from ${context.newsProvider.id}.`);
+  }
 
   const report = buildTickerReportCached(normalized, currentPrice, { ...opts, contextId: context.id, now });
 
@@ -141,15 +166,22 @@ export const buildTickerReportWithContext = async (
     metadataStorage.upsert(normalized, 'target-consensus', consensus, now);
     report.targetConsensus = consensus;
   } else {
-    report.targetConsensus = metadataStorage.getLatest<typeof report.targetConsensus>(normalized, 'target-consensus')?.value ?? report.targetConsensus;
+    report.targetConsensus =
+      metadataStorage.getLatest<typeof report.targetConsensus>(normalized, 'target-consensus')?.value ??
+      report.targetConsensus;
   }
 
   return {
     report,
     context,
+    providerWarnings,
     liveSources: {
-      market: providerPrice ? [context.tickerPriceProvider.id] : ['fallback:mock-anchor-price'],
-      news: newsSignals.length ? [context.newsProvider.id] : ['fallback:empty-news-signals']
+      market: Number.isFinite(providerPrice)
+        ? [context.tickerPriceProvider.id]
+        : latestPrice !== undefined
+          ? ['cache:current-price']
+          : ['unavailable:current-price'],
+      news: newsSignals.length > 0 ? [context.newsProvider.id] : ['unavailable:news-signals']
     }
   };
 };
