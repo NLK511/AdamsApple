@@ -63,7 +63,7 @@ test('app source does not use dangerous runtime primitives', () => {
 test('app source includes no common prompt-injection / agent-threat sinks', () => {
   for (const [file, source] of sourceByFile) {
     for (const check of promptInjectionRiskPatterns) {
-      if (check.reason === 'dynamic fetch target (must be explicit allowlisted endpoint)' && file.startsWith('src/lib/analysis/providers/')) {
+      if (check.reason === 'dynamic fetch target (must be explicit allowlisted endpoint)' && (file.startsWith('src/lib/analysis/providers/') || file.startsWith('src/routes/api/providers/'))) {
         continue;
       }
       assert.equal(

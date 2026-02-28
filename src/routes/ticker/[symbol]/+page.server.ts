@@ -2,7 +2,7 @@
  * Ticker detail route loader.
  * Resolves context/provider profile, model selection, live hydration, and cache/history payloads.
  */
-import type { PageLoad } from './$types';
+import type { PageServerLoad } from './$types';
 import { analysisContexts, getAnalysisContext } from '$lib/analysis/contexts';
 import { buildTickerReportWithContext, metadataStorage } from '$lib/analysis/registry';
 
@@ -11,7 +11,7 @@ const parseMs = (value: string | null) => {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 };
 
-export const load: PageLoad = async ({ params, url, fetch }) => {
+export const load: PageServerLoad = async ({ params, url, fetch }) => {
   const symbol = params.symbol.toUpperCase();
   const contextId = url.searchParams.get('context');
   const context = getAnalysisContext(contextId);

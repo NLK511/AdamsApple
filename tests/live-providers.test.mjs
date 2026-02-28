@@ -1,6 +1,6 @@
 /**
  * Unit tests for Yahoo-backed provider adapters.
- * Verifies price and news-signal normalization for the default_live context.
+ * Verifies proxy-based URL usage and normalized price/news signal mapping.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -22,18 +22,31 @@ const loadProviders = async () => {
   return import(`data:text/javascript;base64,${Buffer.from(js).toString('base64')}`);
 };
 
-test('fetchYahooPrice parses quote endpoint', async () => {
+test('default live provider config uses local SvelteKit proxy endpoints', async () => {
   const providers = await loadProviders();
-  const fetchMock = async () => new Response(JSON.stringify({ quoteResponse: { result: [{ regularMarketPrice: 203.55 }] } }));
+  assert.equal(providers.defaultLiveProviderConfig.yahooQuoteProxyUrl, '/api/providers/yahoo/quote');
+  assert.equal(providers.defaultLiveProviderConfig.yahooSearchProxyUrl, '/api/providers/yahoo/search');
+});
+
+test('fetchYahooPrice requests quote through proxy endpoint', async () => {
+  const providers = await loadProviders();
+  let called = '';
+  const fetchMock = async (url) => {
+    called = String(url);
+    return new Response(JSON.stringify({ quoteResponse: { result: [{ regularMarketPrice: 203.55 }] } }));
+  };
 
   const price = await providers.fetchYahooPrice('AAPL', fetchMock, providers.defaultLiveProviderConfig);
   assert.equal(price, 203.55);
+  assert.match(called, /^\/api\/providers\/yahoo\/quote\?symbols=AAPL$/);
 });
 
-test('fetchYahooNewsSignals maps Yahoo news rows to normalized signals', async () => {
+test('fetchYahooNewsSignals maps Yahoo news rows to normalized signals via proxy', async () => {
   const providers = await loadProviders();
-  const fetchMock = async () =>
-    new Response(
+  let called = '';
+  const fetchMock = async (url) => {
+    called = String(url);
+    return new Response(
       JSON.stringify({
         news: [
           { title: 'AAPL beats revenue expectations', publisher: 'Financial Times' },
@@ -41,8 +54,10 @@ test('fetchYahooNewsSignals maps Yahoo news rows to normalized signals', async (
         ]
       })
     );
+  };
 
   const signals = await providers.fetchYahooNewsSignals('AAPL', fetchMock, providers.defaultLiveProviderConfig);
+  assert.match(called, /^\/api\/providers\/yahoo\/search\?q=AAPL&newsCount=8$/);
   assert.equal(signals.length, 2);
   assert.equal(signals[0].source, 'Financial Times');
   assert.equal(signals[1].source, 'X');

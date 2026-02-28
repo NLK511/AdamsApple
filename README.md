@@ -22,8 +22,8 @@ TradeDesk Advisor is a SvelteKit web app for monitoring watchlists, tracking sim
   - Main dashboard (watchlists, alerts, inbox, ticker links)
 - `src/lib/trading.ts`
   - Trading domain state + simulation + alert trigger + notification utilities
-- `src/routes/ticker/[symbol]/+page.ts`
-  - Route loader for ticker deep-dive page
+- `src/routes/ticker/[symbol]/+page.server.ts`
+  - Server route loader for ticker deep-dive page (runs provider calls server-side)
 - `src/routes/ticker/[symbol]/+page.svelte`
   - Ticker deep-dive UI
 - `src/lib/analysis/contracts.ts`
@@ -57,40 +57,25 @@ npm run preview # preview production build
 
 ## Data sources and APIs (default behavior)
 
-### Default live providers + local fallback
+### SvelteKit proxy-first external API strategy
 
-Ticker deep-dive now attempts to hydrate data from real-life free/common public sources, with automatic fallback to local deterministic models when providers fail or are rate-limited.
+All external Yahoo API calls are proxied through SvelteKit endpoints so browser code never calls cross-origin finance endpoints directly (avoids CORS failures):
 
-Current default sources:
+- `GET /api/providers/yahoo/quote?symbols=<TICKER>`
+- `GET /api/providers/yahoo/search?q=<TICKER>&newsCount=8`
 
-1. **Dashboard prices & changes**
-   - Source: local simulation in `src/lib/trading.ts`
-   - Function: `tickWatchlistsWithNotifications(...)` and helpers
+The live provider module (`src/lib/analysis/providers/live-providers.ts`) calls these internal endpoints by default.
 
-2. **Ticker deep-dive spot price**
-   - Primary source: **Stooq** delayed market CSV endpoint (`stooq.com`)
-   - Function: `fetchStooqPrice(...)` in `src/lib/analysis/providers/live-providers.ts`
+### Default contexts
 
-3. **Target price consensus / analyst proxy**
-   - Primary source: **Yahoo Finance quoteSummary** (`financialData`, `recommendationTrend`)
-   - Function: `fetchYahooTargetConsensus(...)`
-
-4. **Sentiment signals (X + Financial Times)**
-   - Primary source: **Financial Times RSS search** + **Nitter RSS search (X proxy)**
-   - Function: `fetchLiveSentiment(...)`
-
-5. **Fundamental summary + entry strategies**
-   - Source: pluggable local strategy/fundamental engines in `src/lib/analysis/registry.ts`
-   - Cached in metadata storage and recomputed on refresh rules
-
-6. **Notifications**
-   - Source: alert state transitions in local simulation
-   - Storage: browser `localStorage`
+- `default_mock`: uses mock providers for deterministic local prices/news and local engine outputs.
+- `default_live`: uses the Yahoo proxy endpoints above for price/news, while keeping local strategy/fundamental/sentiment engines.
 
 ### Storage keys used by the app
 
 - `trade-desk-watchlists-v1`
 - `trade-desk-notifications-v1`
+- `trade-desk-active-context-v1`
 
 These are explicitly validated by the security tests.
 
@@ -129,7 +114,7 @@ Then:
 - Add a `sentimentModels` array in `registry.ts`
 - Add `getSentimentModel(id)` fallback selector
 - Pass selected sentiment model into `buildTickerReport(...)`
-- Add query-param selection in `src/routes/ticker/[symbol]/+page.ts`
+- Add query-param selection in `src/routes/ticker/[symbol]/+page.server.ts`
 - Add dropdown in `src/routes/ticker/[symbol]/+page.svelte`
 
 ### 4) Testing guidance

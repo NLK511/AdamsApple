@@ -1,17 +1,17 @@
 /**
- * Live provider adapters for market price/news signals built on public Yahoo endpoints.
- * Supplies plug-in provider instances for the default_live analysis context.
+ * Live provider adapters using SvelteKit proxy endpoints for external Yahoo APIs.
+ * Ensures browser consumers avoid direct cross-origin requests and CORS failures.
  */
 import type { NewsProvider, NewsSignal, TickerPriceProvider } from '../contracts';
 
 export interface LiveProviderConfig {
-  yahooQuoteBaseUrl: string;
-  yahooSearchBaseUrl: string;
+  yahooQuoteProxyUrl: string;
+  yahooSearchProxyUrl: string;
 }
 
 export const defaultLiveProviderConfig: LiveProviderConfig = {
-  yahooQuoteBaseUrl: 'https://query1.finance.yahoo.com/v7/finance/quote',
-  yahooSearchBaseUrl: 'https://query1.finance.yahoo.com/v1/finance/search'
+  yahooQuoteProxyUrl: '/api/providers/yahoo/quote',
+  yahooSearchProxyUrl: '/api/providers/yahoo/search'
 };
 
 const parseSource = (publisher: string): NewsSignal['source'] =>
@@ -22,10 +22,10 @@ export const fetchYahooPrice = async (
   fetchImpl: typeof fetch,
   config = defaultLiveProviderConfig
 ): Promise<number | null> => {
-  const url = new URL(config.yahooQuoteBaseUrl);
+  const url = new URL(config.yahooQuoteProxyUrl, 'http://local.proxy');
   url.searchParams.set('symbols', symbol.toUpperCase());
 
-  const response = await fetchImpl(url.toString());
+  const response = await fetchImpl(`${url.pathname}${url.search}`);
   if (!response.ok) return null;
 
   const payload = await response.json();
@@ -39,11 +39,11 @@ export const fetchYahooNewsSignals = async (
   fetchImpl: typeof fetch,
   config = defaultLiveProviderConfig
 ): Promise<NewsSignal[]> => {
-  const url = new URL(config.yahooSearchBaseUrl);
+  const url = new URL(config.yahooSearchProxyUrl, 'http://local.proxy');
   url.searchParams.set('q', symbol.toUpperCase());
   url.searchParams.set('newsCount', '8');
 
-  const response = await fetchImpl(url.toString());
+  const response = await fetchImpl(`${url.pathname}${url.search}`);
   if (!response.ok) return [];
 
   const payload = await response.json();

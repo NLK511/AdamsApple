@@ -29,10 +29,10 @@ const loadRouteModule = async () => {
   const registryUrl = `data:text/javascript;base64,${Buffer.from(transpile(readFileSync(path.join(process.cwd(), 'src/lib/analysis/registry.ts'), 'utf8').replace("from './contracts'", `from '${contractsUrl}'`).replace("from './contexts'", `from '${contextsUrl}'`).replace("from './engines'", `from '${enginesUrl}'`).replace("from './metadata-storage'", `from '${storageUrl}'`).replace("from './providers/mock-providers'", `from '${mockUrl}'`), 'registry.ts')).toString('base64')}`;
 
   const pageJs = transpile(
-    readFileSync(path.join(process.cwd(), 'src/routes/ticker/[symbol]/+page.ts'), 'utf8')
+    readFileSync(path.join(process.cwd(), 'src/routes/ticker/[symbol]/+page.server.ts'), 'utf8')
       .replace(/from '\$lib\/analysis\/registry'/g, `from '${registryUrl}'`)
       .replace(/from '\$lib\/analysis\/contexts'/g, `from '${contextsUrl}'`),
-    '+page.ts'
+    '+page.server.ts'
   );
 
   return import(`data:text/javascript;base64,${Buffer.from(pageJs).toString('base64')}`);

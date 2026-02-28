@@ -58,10 +58,10 @@ test('buildTickerReportWithContext uses yahoo providers in default_live', async 
 
   const fetchMock = async (url) => {
     const u = String(url);
-    if (u.includes('/v7/finance/quote')) {
+    if (u.includes('/api/providers/yahoo/quote')) {
       return new Response(JSON.stringify({ quoteResponse: { result: [{ regularMarketPrice: 222.22 }] } }));
     }
-    if (u.includes('/v1/finance/search')) {
+    if (u.includes('/api/providers/yahoo/search')) {
       return new Response(JSON.stringify({ news: [{ title: 'AAPL upgrade after strong demand', publisher: 'Financial Times' }] }));
     }
     return new Response('{}', { status: 404 });

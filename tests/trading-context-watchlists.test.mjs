@@ -49,8 +49,8 @@ test('defaultWatchlists use active live context providers for price and changes 
   const trading = await loadTrading();
 
   const fetchMock = async (url) => {
-    const target = new URL(String(url));
-    if (target.pathname.includes('/v7/finance/quote')) {
+    const target = new URL(String(url), 'http://local');
+    if (target.pathname.includes('/api/providers/yahoo/quote')) {
       const symbol = target.searchParams.get('symbols');
       const mapping = { AAPL: 201.1, MSFT: 301.2, NVDA: 901.3, TSLA: 251.4, SHOP: 81.5, AMD: 121.6 };
       return new Response(JSON.stringify({ quoteResponse: { result: [{ regularMarketPrice: mapping[symbol] ?? 99.9 }] } }));
@@ -80,8 +80,8 @@ test('addTicker uses currently active context for new ticker values', async () =
   };
 
   const fetchMock = async (url) => {
-    const target = new URL(String(url));
-    if (target.pathname.includes('/v7/finance/quote')) {
+    const target = new URL(String(url), 'http://local');
+    if (target.pathname.includes('/api/providers/yahoo/quote')) {
       return new Response(JSON.stringify({ quoteResponse: { result: [{ regularMarketPrice: 456.78 }] } }));
     }
     return new Response(JSON.stringify({ news: [{ title: 'Weak demand miss', publisher: 'Social Feed' }] }));
