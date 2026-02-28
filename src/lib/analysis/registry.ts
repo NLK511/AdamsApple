@@ -1,3 +1,7 @@
+/**
+ * Analysis registry and composition layer for ticker reports.
+ * Wires default engines, cache usage, and live-provider fallback flow.
+ */
 import type {
   EntryPlan,
   EntryPointModel,
@@ -6,6 +10,8 @@ import type {
   TargetConsensus,
   TickerReport
 } from './contracts';
+import { InMemoryTickerMetadataStorage } from './metadata-storage';
+import { fetchLiveSnapshot } from './providers/live-providers';
 
 const anchorPrice = (symbol: string) => {
   const sum = [...symbol].reduce((acc, char) => acc + char.charCodeAt(0), 0);
@@ -122,8 +128,49 @@ const momentumBreakoutModel: EntryPointModel = {
   }
 };
 
+const rsiMeanReversionModel: EntryPointModel = {
+  id: 'rsi-mean-reversion',
+  name: 'RSI Mean Reversion',
+  plan(symbol, currentPrice): EntryPlan {
+    return {
+      model: this.name,
+      buyZone: `${(currentPrice * 0.95).toFixed(2)} - ${(currentPrice * 0.975).toFixed(2)}`,
+      sellZone: `${(currentPrice * 1.03).toFixed(2)} - ${(currentPrice * 1.06).toFixed(2)}`,
+      stopLoss: (currentPrice * 0.92).toFixed(2),
+      takeProfit: (currentPrice * 1.07).toFixed(2),
+      rationale: [
+        `${symbol} engine assumes oversold pullbacks revert toward 20-day mean.`,
+        'Primary trigger is RSI recovery through a neutral threshold after a downside extension.'
+      ]
+    };
+  }
+};
+
+const atrTrendContinuationModel: EntryPointModel = {
+  id: 'atr-trend-continuation',
+  name: 'ATR Trend Continuation',
+  plan(symbol, currentPrice): EntryPlan {
+    return {
+      model: this.name,
+      buyZone: `${(currentPrice * 1.005).toFixed(2)} - ${(currentPrice * 1.02).toFixed(2)}`,
+      sellZone: `${(currentPrice * 1.09).toFixed(2)} - ${(currentPrice * 1.14).toFixed(2)}`,
+      stopLoss: (currentPrice * 0.965).toFixed(2),
+      takeProfit: (currentPrice * 1.15).toFixed(2),
+      rationale: [
+        `${symbol} uses ATR expansion to confirm trend continuation and avoid low-volatility noise.`,
+        'Stop width scales with volatility to reduce premature exits during strong directional moves.'
+      ]
+    };
+  }
+};
+
 export const fundamentalModels: FundamentalModel[] = [discountedCashFlowModel, qualityFactorModel];
-export const entryPointModels: EntryPointModel[] = [swingStructureModel, momentumBreakoutModel];
+export const entryPointModels: EntryPointModel[] = [
+  swingStructureModel,
+  momentumBreakoutModel,
+  rsiMeanReversionModel,
+  atrTrendContinuationModel
+];
 
 export const getFundamentalModel = (id: string | null | undefined): FundamentalModel =>
   fundamentalModels.find((model) => model.id === id) ?? fundamentalModels[0];
@@ -150,5 +197,104 @@ export const buildTickerReport = (
       fundamentals: fundamentalModels.map((model) => model.summarize(symbol, currentPrice)),
       entries: entryPointModels.map((model) => model.plan(symbol, currentPrice))
     }
+  };
+};
+
+export const metadataStorage = new InMemoryTickerMetadataStorage();
+
+interface CachedBuildOptions {
+  fundamentalModelId?: string | null;
+  entryModelId?: string | null;
+  now?: number;
+}
+
+export const buildTickerReportCached = (
+  symbol: string,
+  currentPrice = anchorPrice(symbol),
+  opts?: CachedBuildOptions
+): TickerReport => {
+  const normalized = symbol.toUpperCase();
+  const now = opts?.now ?? Date.now();
+  const fundamentalModel = getFundamentalModel(opts?.fundamentalModelId);
+  const entryModel = getEntryPointModel(opts?.entryModelId);
+
+  const targetConsensus = metadataStorage.getOrCompute<TargetConsensus>(
+    normalized,
+    'target-consensus',
+    () => buildTargetConsensus(normalized, currentPrice),
+    now
+  ).value;
+
+  const sentiment = metadataStorage.getOrCompute<SentimentDigest>(
+    normalized,
+    'sentiment',
+    () => buildSentimentDigest(normalized),
+    now
+  ).value;
+
+  const fundamental = metadataStorage.getOrCompute(
+    normalized,
+    `fundamental:${fundamentalModel.id}`,
+    () => fundamentalModel.summarize(normalized, currentPrice),
+    now
+  ).value;
+
+  const entryPlan = metadataStorage.getOrCompute<EntryPlan>(
+    normalized,
+    `entry:${entryModel.id}`,
+    () => entryModel.plan(normalized, currentPrice),
+    now
+  ).value;
+
+  const base = buildTickerReport(normalized, currentPrice, {
+    fundamentalModelId: fundamentalModel.id,
+    entryModelId: entryModel.id
+  });
+
+  return {
+    ...base,
+    targetConsensus,
+    sentiment,
+    fundamental,
+    entryPlan
+  };
+};
+
+export const buildTickerReportLive = async (
+  symbol: string,
+  opts?: CachedBuildOptions,
+  fetchImpl: typeof fetch = fetch
+): Promise<{ report: TickerReport; liveSources: { market: string[]; news: string[] } }> => {
+  const normalized = symbol.toUpperCase();
+  const now = opts?.now ?? Date.now();
+
+  const snapshot = await fetchLiveSnapshot(normalized, fetchImpl);
+  const currentPrice = snapshot.currentPrice ?? anchorPrice(normalized);
+
+  const shouldRefreshTarget = metadataStorage.shouldRefresh(normalized, 'target-consensus', now);
+  const shouldRefreshSentiment = metadataStorage.shouldRefresh(normalized, 'sentiment', now);
+
+  const report = buildTickerReportCached(normalized, currentPrice, opts);
+
+  if (snapshot.targetConsensus && shouldRefreshTarget) {
+    metadataStorage.upsert(normalized, 'target-consensus', snapshot.targetConsensus, now);
+    report.targetConsensus = snapshot.targetConsensus;
+  } else {
+    report.targetConsensus =
+      metadataStorage.getLatest<TargetConsensus>(normalized, 'target-consensus')?.value ??
+      report.targetConsensus;
+  }
+
+  if (snapshot.sentiment && shouldRefreshSentiment) {
+    metadataStorage.upsert(normalized, 'sentiment', snapshot.sentiment, now);
+    report.sentiment = snapshot.sentiment;
+  } else {
+    report.sentiment =
+      metadataStorage.getLatest<SentimentDigest>(normalized, 'sentiment')?.value ?? report.sentiment;
+  }
+
+  return {
+    report,
+    liveSources: snapshot.sources
   };
 };

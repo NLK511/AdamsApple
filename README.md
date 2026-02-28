@@ -57,9 +57,9 @@ npm run preview # preview production build
 
 ## Data sources and APIs (default behavior)
 
-### Important: current default is **fully local, deterministic mock logic**
+### Default live providers + local fallback
 
-By default, the app does **not** call external market/news APIs for ticker metadata in the detail tab.
+Ticker deep-dive now attempts to hydrate data from real-life free/common public sources, with automatic fallback to local deterministic models when providers fail or are rate-limited.
 
 Current default sources:
 
@@ -67,14 +67,23 @@ Current default sources:
    - Source: local simulation in `src/lib/trading.ts`
    - Function: `tickWatchlistsWithNotifications(...)` and helpers
 
-2. **Target consensus, sentiment, fundamentals, entry/exit plans**
-   - Source: local model logic in `src/lib/analysis/registry.ts`
-   - Functions:
-     - `buildTargetConsensus(...)`
-     - `buildSentimentDigest(...)`
-     - `buildTickerReport(...)`
+2. **Ticker deep-dive spot price**
+   - Primary source: **Stooq** delayed market CSV endpoint (`stooq.com`)
+   - Function: `fetchStooqPrice(...)` in `src/lib/analysis/providers/live-providers.ts`
 
-3. **Notifications**
+3. **Target price consensus / analyst proxy**
+   - Primary source: **Yahoo Finance quoteSummary** (`financialData`, `recommendationTrend`)
+   - Function: `fetchYahooTargetConsensus(...)`
+
+4. **Sentiment signals (X + Financial Times)**
+   - Primary source: **Financial Times RSS search** + **Nitter RSS search (X proxy)**
+   - Function: `fetchLiveSentiment(...)`
+
+5. **Fundamental summary + entry strategies**
+   - Source: pluggable local strategy/fundamental engines in `src/lib/analysis/registry.ts`
+   - Cached in metadata storage and recomputed on refresh rules
+
+6. **Notifications**
    - Source: alert state transitions in local simulation
    - Storage: browser `localStorage`
 
@@ -153,6 +162,17 @@ In `src/lib/analysis/registry.ts`:
 - default models:
   - `swing-structure`
   - `momentum-breakout`
+  - `rsi-mean-reversion`
+  - `atr-trend-continuation`
+
+
+
+### Built-in strategy intents
+
+- **Swing Structure**: pullback entries around support with wider trend-following exits.
+- **Momentum Breakout**: confirmation entries after resistance breaks with tighter protective stops.
+- **RSI Mean Reversion**: oversold rebound setup targeting return to trend mean.
+- **ATR Trend Continuation**: volatility-adjusted continuation entries during expanding trend moves.
 
 ### Add a new entry model
 
@@ -197,6 +217,67 @@ In `src/lib/analysis/registry.ts`:
 
 ---
 
+
+## Metadata cache and history
+
+Ticker inferred metadata is cached in a lightweight in-memory storage (`src/lib/analysis/metadata-storage.ts`) used by `buildTickerReportCached(...)` in the analysis registry.
+
+### What is cached
+
+- target consensus (`target-consensus`)
+- sentiment digest (`sentiment`)
+- fundamental summaries (`fundamental:<model-id>`)
+- entry plans (`entry:<model-id>`)
+
+### What is not cached
+
+- highly volatile price simulation values (spot price, fast-moving table changes)
+
+### Refresh interval precedence
+
+1. Per-ticker + per-metadata interval (highest priority)
+2. Global metadata refresh interval (fallback)
+
+Ticker detail route accepts these query params to configure intervals:
+
+- `refreshAllMs`
+- `refreshTargetMs`
+- `refreshSentimentMs`
+- `refreshFundamentalMs`
+- `refreshEntryMs`
+
+Example:
+
+```text
+/ticker/AAPL?refreshAllMs=300000&refreshSentimentMs=3600000
+```
+
+Each cached metadata key stores history snapshots so evolution over time is available.
+
+---
+
+## Run lightweight storage locally
+
+You can spin up a tiny local metadata storage server for development tooling/integration experiments:
+
+```bash
+npm run storage:dev
+```
+
+Default endpoint: `http://localhost:7373`
+
+Available endpoints:
+
+- `GET /health`
+- `GET /cache`
+- `POST /cache/global-interval` with `{"refreshMs": 300000}`
+- `GET /cache/:symbol`
+- `POST /cache/:symbol/interval` with `{"key": "sentiment", "refreshMs": 3600000}`
+
+This server is intentionally lightweight and in-memory only.
+
+---
+
 ## Integrating real external APIs (optional)
 
 If you want live APIs (market data/news/analyst endpoints), keep provider logic isolated from UI:
@@ -205,6 +286,18 @@ If you want live APIs (market data/news/analyst endpoints), keep provider logic 
 2. Define provider interfaces (fetch methods + normalized return types).
 3. Inject providers into engine functions (or load-layer composition), instead of calling APIs directly in Svelte components.
 4. Use env vars for API keys and base URLs.
+
+
+### Live provider endpoint configuration
+
+`src/lib/analysis/providers/live-providers.ts` exposes `defaultLiveProviderConfig` with defaults:
+
+- `stooqBaseUrl`: `https://stooq.com/q/l/`
+- `yahooQuoteSummaryBaseUrl`: `https://query1.finance.yahoo.com/v10/finance/quoteSummary/`
+- `ftRssSearchBaseUrl`: `https://www.ft.com/search`
+- `xRssSearchBaseUrl`: `https://nitter.net/search/rss`
+
+You can override these by creating your own config object and calling provider helpers directly in custom load logic.
 
 ### Suggested environment variables
 

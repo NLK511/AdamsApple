@@ -1,3 +1,7 @@
+/**
+ * Unit tests for alert-triggered notification logic.
+ * Validates emission, de-duplication, and read/unread helper transitions.
+ */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';

@@ -1,3 +1,7 @@
+/**
+ * Trading domain module for watchlists, alerts, and simulated market ticks.
+ * Centralizes state shapes and pure update helpers used by dashboard UI.
+ */
 export type ChangeBucket = 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
 
 export interface AlertRule {

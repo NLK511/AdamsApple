@@ -1,3 +1,7 @@
+<!--
+  Ticker deep-dive view.
+  Renders consensus, sentiment, fundamentals, entry plans, and cache controls.
+-->
 <script lang="ts">
   export let data;
 
@@ -6,6 +10,19 @@
     if (!target) return;
     const url = new URL(window.location.href);
     url.searchParams.set(kind, target.value);
+    window.location.href = url.toString();
+  };
+
+  const setRefreshInterval = (kind: 'refreshAllMs' | 'refreshTargetMs' | 'refreshSentimentMs' | 'refreshFundamentalMs' | 'refreshEntryMs', event: Event) => {
+    const target = event.currentTarget as HTMLInputElement | null;
+    if (!target) return;
+    const url = new URL(window.location.href);
+    const value = target.value.trim();
+    if (!value) {
+      url.searchParams.delete(kind);
+    } else {
+      url.searchParams.set(kind, value);
+    }
     window.location.href = url.toString();
   };
 </script>
@@ -20,6 +37,7 @@
       <p class="eyebrow">Ticker deep dive</p>
       <h1>{data.symbol}</h1>
       <p>Spot price: <strong>${data.report.currentPrice.toFixed(2)}</strong></p>
+      <p class="history">Live providers: market [{data.liveSources.market.join(', ') || 'fallback'}], news [{data.liveSources.news.join(', ') || 'fallback'}]</p>
     </div>
     <a href="/" class="back">← Back to dashboard</a>
   </header>
@@ -47,6 +65,35 @@
     </div>
   </section>
 
+
+
+  <section class="panel">
+    <h2>Metadata cache settings</h2>
+    <p>Global refresh interval: <strong>{data.cache.globalRefreshMs} ms</strong>. Per-metadata ticker intervals override this.</p>
+    <div class="controls">
+      <div>
+        <label for="refresh-all">Global interval (ms)</label>
+        <input id="refresh-all" type="number" min="1000" placeholder="e.g. 300000" on:change={(event) => setRefreshInterval('refreshAllMs', event)} />
+      </div>
+      <div>
+        <label for="refresh-target">Target consensus interval (ms)</label>
+        <input id="refresh-target" type="number" min="1000" placeholder="e.g. 900000" on:change={(event) => setRefreshInterval('refreshTargetMs', event)} />
+      </div>
+      <div>
+        <label for="refresh-sentiment">Sentiment interval (ms)</label>
+        <input id="refresh-sentiment" type="number" min="1000" placeholder="e.g. 3600000" on:change={(event) => setRefreshInterval('refreshSentimentMs', event)} />
+      </div>
+      <div>
+        <label for="refresh-fundamental">Fundamental interval (ms)</label>
+        <input id="refresh-fundamental" type="number" min="1000" placeholder="e.g. 86400000" on:change={(event) => setRefreshInterval('refreshFundamentalMs', event)} />
+      </div>
+      <div>
+        <label for="refresh-entry">Entry strategy interval (ms)</label>
+        <input id="refresh-entry" type="number" min="1000" placeholder="e.g. 1800000" on:change={(event) => setRefreshInterval('refreshEntryMs', event)} />
+      </div>
+    </div>
+  </section>
+
   <section class="panel">
     <h2>Target price consensus and analyst breakdown</h2>
     <p>
@@ -67,6 +114,7 @@
         {/each}
       </tbody>
     </table>
+    <p class="history">Target history snapshots: {data.cache.targetHistory.length}</p>
   </section>
 
   <section class="panel">
@@ -77,6 +125,7 @@
         <li>{source.source}: {source.signal} (confidence {Math.round(source.confidence * 100)}%)</li>
       {/each}
     </ul>
+    <p class="history">Sentiment history snapshots: {data.cache.sentimentHistory.length}</p>
   </section>
 
   <section class="panel">
@@ -100,6 +149,7 @@
         <li><strong>{model.model}:</strong> {model.summary}</li>
       {/each}
     </ul>
+    <p class="history">Fundamental history snapshots: {data.cache.fundamentalHistory.length}</p>
   </section>
 
   <section class="panel">
@@ -117,6 +167,7 @@
         <li><strong>{plan.model}:</strong> Buy {plan.buyZone}, Sell {plan.sellZone}</li>
       {/each}
     </ul>
+    <p class="history">Entry strategy history snapshots: {data.cache.entryHistory.length}</p>
   </section>
 </main>
 
@@ -132,7 +183,8 @@
   th,td{padding:.45rem;border-bottom:1px solid #e2e8f0;text-align:left}
   .cols{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
   .controls{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
-  select{width:100%;padding:.45rem;border:1px solid #cbd5e1;border-radius:8px}
+  select,input{width:100%;padding:.45rem;border:1px solid #cbd5e1;border-radius:8px}
+  .history{margin:.6rem 0 0;color:#64748b;font-size:.9rem}
   .back{color:#4f46e5;text-decoration:none;font-weight:600}
   @media (max-width: 780px){.cols,.controls{grid-template-columns:1fr}}
 </style>

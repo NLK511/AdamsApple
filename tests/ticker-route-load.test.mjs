@@ -1,3 +1,7 @@
+/**
+ * Route-loader tests for ticker deep-dive page behavior.
+ * Checks symbol normalization, model fallback, and dashboard link contract.
+ */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -15,7 +19,14 @@ const transpile = (source, fileName) =>
   }).outputText;
 
 const loadRouteModule = async () => {
-  const registrySource = readFileSync(path.join(process.cwd(), 'src/lib/analysis/registry.ts'), 'utf8');
+  const storageSource = readFileSync(path.join(process.cwd(), 'src/lib/analysis/metadata-storage.ts'), 'utf8');
+  const storageJs = transpile(storageSource, 'metadata-storage.ts');
+  const storageUrl = `data:text/javascript;base64,${Buffer.from(storageJs).toString('base64')}`;
+
+  const registrySource = readFileSync(path.join(process.cwd(), 'src/lib/analysis/registry.ts'), 'utf8')
+    .replace("from './metadata-storage'", `from '${storageUrl}'`)
+    .replace("from './contracts'", "from 'data:text/javascript,export{}'")
+      .replace("from './providers/live-providers'", "from 'data:text/javascript,export const fetchLiveSnapshot=async()=>({symbol:\"AAPL\",currentPrice:null,targetConsensus:null,sentiment:null,sources:{market:[],news:[]}});'");
   const registryJs = transpile(registrySource, 'registry.ts');
   const registryUrl = `data:text/javascript;base64,${Buffer.from(registryJs).toString('base64')}`;
 
@@ -31,7 +42,7 @@ test('ticker detail load normalizes symbol and applies selected engines', async 
   const pageModule = await loadRouteModule();
   const url = new URL('https://example.com/ticker/aapl?entry=momentum-breakout&fundamental=quality-factors');
 
-  const data = pageModule.load({ params: { symbol: 'aapl' }, url });
+  const data = await pageModule.load({ params: { symbol: 'aapl' }, url, fetch: globalThis.fetch });
 
   assert.equal(data.symbol, 'AAPL');
   assert.equal(data.report.entryPlan.model, 'Momentum Breakout');
@@ -44,7 +55,7 @@ test('ticker detail load falls back to default engines for unknown ids', async (
   const pageModule = await loadRouteModule();
   const url = new URL('https://example.com/ticker/msft?entry=unknown&fundamental=none');
 
-  const data = pageModule.load({ params: { symbol: 'msft' }, url });
+  const data = await pageModule.load({ params: { symbol: 'msft' }, url, fetch: globalThis.fetch });
 
   assert.equal(data.report.entryPlan.model, 'Swing Structure');
   assert.equal(data.report.fundamental.model, 'DCF Core');

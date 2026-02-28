@@ -1,3 +1,7 @@
+<!--
+  Main dashboard route.
+  Manages watchlists, alerts, notifications, and ticker navigation to detail tabs.
+-->
 <script lang="ts">
   import { browser } from '$app/environment';
   import {

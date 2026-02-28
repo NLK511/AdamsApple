@@ -1,3 +1,7 @@
+/**
+ * Unit tests for analysis engine outputs and model-switch behavior.
+ * Validates report shape consistency across strategy variants.
+ */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -6,7 +10,26 @@ import ts from 'typescript';
 
 const loadTsModule = async (relativePath) => {
   const sourcePath = path.join(process.cwd(), relativePath);
-  const source = readFileSync(sourcePath, 'utf8');
+  let source = readFileSync(sourcePath, 'utf8');
+
+  if (relativePath.endsWith('registry.ts')) {
+    const storageSource = readFileSync(path.join(process.cwd(), 'src/lib/analysis/metadata-storage.ts'), 'utf8');
+    const storageJs = ts.transpileModule(storageSource, {
+      compilerOptions: {
+        target: ts.ScriptTarget.ES2022,
+        module: ts.ModuleKind.ES2022,
+        moduleResolution: ts.ModuleResolutionKind.Bundler
+      },
+      fileName: 'metadata-storage.ts'
+    }).outputText;
+    const storageUrl = `data:text/javascript;base64,${Buffer.from(storageJs).toString('base64')}`;
+
+    source = source
+      .replace("from './metadata-storage'", `from '${storageUrl}'`)
+      .replace("from './contracts'", "from 'data:text/javascript,export{}'")
+      .replace("from './providers/live-providers'", "from 'data:text/javascript,export const fetchLiveSnapshot=async()=>({symbol:\"AAPL\",currentPrice:null,targetConsensus:null,sentiment:null,sources:{market:[],news:[]}});'");
+  }
+
   const transpiled = ts.transpileModule(source, {
     compilerOptions: {
       target: ts.ScriptTarget.ES2022,
@@ -63,4 +86,18 @@ test('sentiment sources include both required channels', async () => {
 
   assert.ok(sources.includes('X'));
   assert.ok(sources.includes('Financial Times'));
+});
+
+
+test('entry engine catalog includes real-life pluggable strategies by default', async () => {
+  const registry = await loadTsModule('src/lib/analysis/registry.ts');
+  const ids = registry.entryPointModels.map((model) => model.id);
+
+  assert.ok(ids.includes('rsi-mean-reversion'));
+  assert.ok(ids.includes('atr-trend-continuation'));
+
+  const report = registry.buildTickerReport('AAPL', 180);
+  const compared = report.comparisons.entries.map((plan) => plan.model);
+  assert.ok(compared.includes('RSI Mean Reversion'));
+  assert.ok(compared.includes('ATR Trend Continuation'));
 });

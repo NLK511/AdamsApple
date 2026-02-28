@@ -1,3 +1,7 @@
+/**
+ * Shared analysis contracts and model interfaces.
+ * Defines report, sentiment, fundamental, and entry-plan data shapes.
+ */
 export interface AnalystTarget {
   analyst: string;
   targetPrice: number;
