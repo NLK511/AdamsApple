@@ -128,8 +128,49 @@ const momentumBreakoutModel: EntryPointModel = {
   }
 };
 
+const rsiMeanReversionModel: EntryPointModel = {
+  id: 'rsi-mean-reversion',
+  name: 'RSI Mean Reversion',
+  plan(symbol, currentPrice): EntryPlan {
+    return {
+      model: this.name,
+      buyZone: `${(currentPrice * 0.95).toFixed(2)} - ${(currentPrice * 0.975).toFixed(2)}`,
+      sellZone: `${(currentPrice * 1.03).toFixed(2)} - ${(currentPrice * 1.06).toFixed(2)}`,
+      stopLoss: (currentPrice * 0.92).toFixed(2),
+      takeProfit: (currentPrice * 1.07).toFixed(2),
+      rationale: [
+        `${symbol} engine assumes oversold pullbacks revert toward 20-day mean.`,
+        'Primary trigger is RSI recovery through a neutral threshold after a downside extension.'
+      ]
+    };
+  }
+};
+
+const atrTrendContinuationModel: EntryPointModel = {
+  id: 'atr-trend-continuation',
+  name: 'ATR Trend Continuation',
+  plan(symbol, currentPrice): EntryPlan {
+    return {
+      model: this.name,
+      buyZone: `${(currentPrice * 1.005).toFixed(2)} - ${(currentPrice * 1.02).toFixed(2)}`,
+      sellZone: `${(currentPrice * 1.09).toFixed(2)} - ${(currentPrice * 1.14).toFixed(2)}`,
+      stopLoss: (currentPrice * 0.965).toFixed(2),
+      takeProfit: (currentPrice * 1.15).toFixed(2),
+      rationale: [
+        `${symbol} uses ATR expansion to confirm trend continuation and avoid low-volatility noise.`,
+        'Stop width scales with volatility to reduce premature exits during strong directional moves.'
+      ]
+    };
+  }
+};
+
 export const fundamentalModels: FundamentalModel[] = [discountedCashFlowModel, qualityFactorModel];
-export const entryPointModels: EntryPointModel[] = [swingStructureModel, momentumBreakoutModel];
+export const entryPointModels: EntryPointModel[] = [
+  swingStructureModel,
+  momentumBreakoutModel,
+  rsiMeanReversionModel,
+  atrTrendContinuationModel
+];
 
 export const getFundamentalModel = (id: string | null | undefined): FundamentalModel =>
   fundamentalModels.find((model) => model.id === id) ?? fundamentalModels[0];

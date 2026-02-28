@@ -162,6 +162,17 @@ In `src/lib/analysis/registry.ts`:
 - default models:
   - `swing-structure`
   - `momentum-breakout`
+  - `rsi-mean-reversion`
+  - `atr-trend-continuation`
+
+
+
+### Built-in strategy intents
+
+- **Swing Structure**: pullback entries around support with wider trend-following exits.
+- **Momentum Breakout**: confirmation entries after resistance breaks with tighter protective stops.
+- **RSI Mean Reversion**: oversold rebound setup targeting return to trend mean.
+- **ATR Trend Continuation**: volatility-adjusted continuation entries during expanding trend moves.
 
 ### Add a new entry model
 

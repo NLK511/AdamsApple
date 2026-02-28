@@ -87,3 +87,17 @@ test('sentiment sources include both required channels', async () => {
   assert.ok(sources.includes('X'));
   assert.ok(sources.includes('Financial Times'));
 });
+
+
+test('entry engine catalog includes real-life pluggable strategies by default', async () => {
+  const registry = await loadTsModule('src/lib/analysis/registry.ts');
+  const ids = registry.entryPointModels.map((model) => model.id);
+
+  assert.ok(ids.includes('rsi-mean-reversion'));
+  assert.ok(ids.includes('atr-trend-continuation'));
+
+  const report = registry.buildTickerReport('AAPL', 180);
+  const compared = report.comparisons.entries.map((plan) => plan.model);
+  assert.ok(compared.includes('RSI Mean Reversion'));
+  assert.ok(compared.includes('ATR Trend Continuation'));
+});
