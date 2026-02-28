@@ -1,0 +1,9 @@
+node_modules
+
+# SvelteKit generated files
+.svelte-kit
+/build
+
+# OS
+.DS_Store
+Thumbs.db
