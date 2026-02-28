@@ -1,13 +1,14 @@
 {
   "name": "adams-apple",
   "private": true,
-  "version": "0.0.1",
+  "version": "0.0.2",
   "type": "module",
   "scripts": {
-    "dev": "vite dev",
-    "build": "vite build",
-    "preview": "vite preview",
-    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json"
+    "dev": "node ./node_modules/vite/bin/vite.js dev",
+    "build": "node ./node_modules/vite/bin/vite.js build",
+    "preview": "node ./node_modules/vite/bin/vite.js preview",
+    "check": "node ./node_modules/@sveltejs/kit/svelte-kit.js sync && node ./node_modules/svelte-check/bin/svelte-check --tsconfig ./tsconfig.json",
+    "test": "node --test tests/**/*.test.mjs"
   },
   "devDependencies": {
     "@sveltejs/adapter-auto": "^4.0.0",
