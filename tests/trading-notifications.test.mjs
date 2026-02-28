@@ -8,19 +8,29 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
 
-const loadTradingModule = async () => {
-  const sourcePath = path.join(process.cwd(), 'src/lib/trading.ts');
-  const source = readFileSync(sourcePath, 'utf8');
-  const transpiled = ts.transpileModule(source, {
+const transpile = (source, fileName) =>
+  ts.transpileModule(source, {
     compilerOptions: {
       target: ts.ScriptTarget.ES2022,
-      module: ts.ModuleKind.ES2022
+      module: ts.ModuleKind.ES2022,
+      moduleResolution: ts.ModuleResolutionKind.Bundler
     },
-    fileName: 'trading.ts'
+    fileName
   }).outputText;
 
-  const dataUrl = `data:text/javascript;base64,${Buffer.from(transpiled).toString('base64')}`;
-  return import(dataUrl);
+const loadTradingModule = async () => {
+  const contractsUrl = `data:text/javascript;base64,${Buffer.from('export {};').toString('base64')}`;
+  const enginesUrl = `data:text/javascript;base64,${Buffer.from(transpile(readFileSync(path.join(process.cwd(), 'src/lib/analysis/engines.ts'), 'utf8').replace("from './contracts'", `from '${contractsUrl}'`), 'engines.ts')).toString('base64')}`;
+  const mockUrl = `data:text/javascript;base64,${Buffer.from(transpile(readFileSync(path.join(process.cwd(), 'src/lib/analysis/providers/mock-providers.ts'), 'utf8').replace("from '../contracts'", `from '${contractsUrl}'`), 'mock-providers.ts')).toString('base64')}`;
+  const liveUrl = `data:text/javascript;base64,${Buffer.from(transpile(readFileSync(path.join(process.cwd(), 'src/lib/analysis/providers/live-providers.ts'), 'utf8').replace("from '../contracts'", `from '${contractsUrl}'`), 'live-providers.ts')).toString('base64')}`;
+  const contextsUrl = `data:text/javascript;base64,${Buffer.from(transpile(readFileSync(path.join(process.cwd(), 'src/lib/analysis/contexts.ts'), 'utf8').replace("from './contracts'", `from '${contractsUrl}'`).replace("from './engines'", `from '${enginesUrl}'`).replace("from './providers/live-providers'", `from '${liveUrl}'`).replace("from './providers/mock-providers'", `from '${mockUrl}'`), 'contexts.ts')).toString('base64')}`;
+
+  const tradingSource = readFileSync(path.join(process.cwd(), 'src/lib/trading.ts'), 'utf8')
+    .replace("from './analysis/contexts'", `from '${contextsUrl}'`)
+    .replace("from './analysis/providers/mock-providers'", `from '${mockUrl}'`);
+
+  const transpiled = transpile(tradingSource, 'trading.ts');
+  return import(`data:text/javascript;base64,${Buffer.from(transpiled).toString('base64')}`);
 };
 
 const withMockedRandom = async (value, callback) => {

@@ -82,6 +82,7 @@ test('localStorage usage is constrained to authorized storage keys only', () => 
   assert.ok(pageSource, `${pagePath} should exist`);
   assert.match(pageSource, /const\s+STORAGE_KEY\s*=\s*['"]trade-desk-watchlists-v1['"]/);
   assert.match(pageSource, /const\s+NOTIFICATION_STORAGE_KEY\s*=\s*['"]trade-desk-notifications-v1['"]/);
+  assert.match(pageSource, /const\s+ACTIVE_CONTEXT_KEY\s*=\s*['"]trade-desk-active-context-v1['"]/);
 
   const localStorageCalls = [...pageSource.matchAll(/localStorage\.(getItem|setItem|removeItem)\(([^)]*)\)/g)];
   assert.ok(localStorageCalls.length > 0, 'expected localStorage usage to be present');
@@ -89,7 +90,7 @@ test('localStorage usage is constrained to authorized storage keys only', () => 
   for (const [, method, args] of localStorageCalls) {
     assert.match(
       args,
-      /\b(STORAGE_KEY|NOTIFICATION_STORAGE_KEY)\b/,
+      /\b(STORAGE_KEY|NOTIFICATION_STORAGE_KEY|ACTIVE_CONTEXT_KEY)\b/,
       `localStorage.${method} must only use authorized keys, got args: ${args.trim()}`
     );
   }

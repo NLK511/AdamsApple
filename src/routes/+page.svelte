@@ -4,6 +4,8 @@
 -->
 <script lang="ts">
   import { browser } from '$app/environment';
+  import { onMount } from 'svelte';
+  import { analysisContexts } from '$lib/analysis/contexts';
   import {
     addAlert,
     addTicker,
@@ -21,8 +23,10 @@
 
   const STORAGE_KEY = 'trade-desk-watchlists-v1';
   const NOTIFICATION_STORAGE_KEY = 'trade-desk-notifications-v1';
+  const ACTIVE_CONTEXT_KEY = 'trade-desk-active-context-v1';
 
-  let watchlists: Watchlist[] = defaultWatchlists();
+  let activeContextId = analysisContexts[0].id;
+  let watchlists: Watchlist[] = [];
   let notifications: PriceNotification[] = [];
   let showInbox = false;
   let selectedWatchlistId = watchlists[0]?.id ?? '';
@@ -42,43 +46,64 @@
     signDisplay: 'always'
   });
 
-  if (browser) {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      try {
-        const parsed = JSON.parse(raw) as Watchlist[];
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          watchlists = parsed;
-          selectedWatchlistId = parsed[0].id;
+  onMount(() => {
+    if (!browser) return;
+
+    let handle: ReturnType<typeof setInterval> | undefined;
+
+    const init = async () => {
+      const storedContextId = localStorage.getItem(ACTIVE_CONTEXT_KEY);
+      if (storedContextId && analysisContexts.some((ctx) => ctx.id === storedContextId)) {
+        activeContextId = storedContextId;
+      }
+
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw) as Watchlist[];
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            watchlists = parsed;
+            selectedWatchlistId = parsed[0].id;
+          }
+        } catch {
+          localStorage.removeItem(STORAGE_KEY);
         }
-      } catch {
-        localStorage.removeItem(STORAGE_KEY);
       }
-    }
 
-    const rawNotifications = localStorage.getItem(NOTIFICATION_STORAGE_KEY);
-    if (rawNotifications) {
-      try {
-        const parsedNotifications = JSON.parse(rawNotifications) as PriceNotification[];
-        if (Array.isArray(parsedNotifications)) {
-          notifications = parsedNotifications;
+      if (watchlists.length === 0) {
+        watchlists = await defaultWatchlists(activeContextId);
+        selectedWatchlistId = watchlists[0]?.id ?? '';
+        persist();
+      }
+
+      const rawNotifications = localStorage.getItem(NOTIFICATION_STORAGE_KEY);
+      if (rawNotifications) {
+        try {
+          const parsedNotifications = JSON.parse(rawNotifications) as PriceNotification[];
+          if (Array.isArray(parsedNotifications)) {
+            notifications = parsedNotifications;
+          }
+        } catch {
+          localStorage.removeItem(NOTIFICATION_STORAGE_KEY);
         }
-      } catch {
-        localStorage.removeItem(NOTIFICATION_STORAGE_KEY);
       }
-    }
 
-    const handle = setInterval(() => {
-      const result = tickWatchlistsWithNotifications(watchlists);
-      watchlists = result.watchlists;
-      if (result.notifications.length > 0) {
-        notifications = [...result.notifications, ...notifications];
-      }
-      persist();
-    }, 2800);
+      handle = setInterval(() => {
+        const result = tickWatchlistsWithNotifications(watchlists);
+        watchlists = result.watchlists;
+        if (result.notifications.length > 0) {
+          notifications = [...result.notifications, ...notifications];
+        }
+        persist();
+      }, 2800);
+    };
 
-    window.addEventListener('beforeunload', () => clearInterval(handle));
-  }
+    void init();
+
+    return () => {
+      if (handle) clearInterval(handle);
+    };
+  });
 
   $: selectedWatchlist =
     watchlists.find((watchlist) => watchlist.id === selectedWatchlistId) ?? watchlists[0] ?? null;
@@ -92,6 +117,7 @@
     if (!browser) return;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(watchlists));
     localStorage.setItem(NOTIFICATION_STORAGE_KEY, JSON.stringify(notifications));
+    localStorage.setItem(ACTIVE_CONTEXT_KEY, activeContextId);
   };
 
   const toggleInbox = () => {
@@ -120,13 +146,30 @@
     persist();
   };
 
-  const createTicker = () => {
+  const createTicker = async () => {
     if (!selectedWatchlist || !tickerSymbol.trim()) return;
-    watchlists = watchlists.map((watchlist) =>
-      watchlist.id === selectedWatchlist.id ? addTicker(watchlist, tickerSymbol.trim()) : watchlist
+    watchlists = await Promise.all(
+      watchlists.map(async (watchlist) =>
+        watchlist.id === selectedWatchlist.id
+          ? addTicker(watchlist, tickerSymbol.trim(), activeContextId)
+          : watchlist
+      )
     );
     tickerSymbol = '';
     persist();
+  };
+
+  const setActiveContext = async (event: Event) => {
+    const target = event.currentTarget as HTMLSelectElement | null;
+    const next = target?.value ?? analysisContexts[0].id;
+    activeContextId = analysisContexts.some((ctx) => ctx.id === next) ? next : analysisContexts[0].id;
+    if (browser) localStorage.setItem(ACTIVE_CONTEXT_KEY, activeContextId);
+
+    if (watchlists.length === 0) {
+      watchlists = await defaultWatchlists(activeContextId);
+      selectedWatchlistId = watchlists[0]?.id ?? '';
+      persist();
+    }
   };
 
   const getAlertDraft = (tickerId: string) =>
@@ -226,6 +269,12 @@
       <div>
         <h1>TradeDesk Advisor</h1>
         <p>Monitor curated watchlists, track price momentum, and react quickly with threshold alerts.</p>
+        <label class="context-label" for="dashboard-context">Active pricing context</label>
+        <select id="dashboard-context" class="context-select" value={activeContextId} on:change={setActiveContext}>
+          {#each analysisContexts as context}
+            <option value={context.id}>{context.name}</option>
+          {/each}
+        </select>
       </div>
       <button class="inbox-toggle" on:click={toggleInbox}>
         Inbox

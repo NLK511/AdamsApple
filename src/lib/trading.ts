@@ -2,6 +2,9 @@
  * Trading domain module for watchlists, alerts, and simulated market ticks.
  * Centralizes state shapes and pure update helpers used by dashboard UI.
  */
+import { getAnalysisContext } from './analysis/contexts';
+import { anchorPrice } from './analysis/providers/mock-providers';
+
 export type ChangeBucket = 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
 
 export interface AlertRule {
@@ -47,66 +50,71 @@ interface TickResult {
 }
 
 const buckets: ChangeBucket[] = ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'];
-
 const uid = () => Math.random().toString(36).slice(2, 10);
 
-const seedTicker = (symbol: string): Ticker => {
-  const base = 25 + Math.random() * 375;
+const scoreToChanges = (score: number): Record<ChangeBucket, number> => ({
+  daily: Number((score * 0.9).toFixed(2)),
+  weekly: Number((score * 1.7).toFixed(2)),
+  monthly: Number((score * 3.1).toFixed(2)),
+  quarterly: Number((score * 4.6).toFixed(2)),
+  yearly: Number((score * 7.5).toFixed(2))
+});
+
+const fallbackChanges = (symbol: string, price: number): Record<ChangeBucket, number> => {
+  const seed = [...symbol].reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  const base = ((seed % 11) - 5) / 2;
+  const drift = price > 250 ? 0.4 : -0.2;
+  return scoreToChanges(Number((base + drift).toFixed(2)));
+};
+
+const buildTicker = async (
+  symbol: string,
+  contextId = 'default_mock',
+  fetchImpl: typeof fetch = fetch
+): Promise<Ticker> => {
+  const normalized = symbol.toUpperCase();
+  const context = getAnalysisContext(contextId);
+  const providerPrice = await context.tickerPriceProvider.fetchPrice(normalized, fetchImpl);
+  const currentPrice = Number((providerPrice ?? anchorPrice(normalized)).toFixed(2));
+
+  const signals = await context.newsProvider.fetchSignals(normalized, fetchImpl);
+  const sentiment = context.sentimentEngine.build(normalized, signals);
+  const changes = signals.length > 0 ? scoreToChanges(sentiment.score) : fallbackChanges(normalized, currentPrice);
+
   return {
     id: uid(),
-    symbol: symbol.toUpperCase(),
-    currentPrice: Number(base.toFixed(2)),
-    changes: {
-      daily: Number((Math.random() * 4 - 2).toFixed(2)),
-      weekly: Number((Math.random() * 8 - 4).toFixed(2)),
-      monthly: Number((Math.random() * 15 - 7.5).toFixed(2)),
-      quarterly: Number((Math.random() * 30 - 15).toFixed(2)),
-      yearly: Number((Math.random() * 65 - 20).toFixed(2))
-    },
+    symbol: normalized,
+    currentPrice,
+    changes,
     alerts: []
   };
 };
 
-const buildNotification = (
+const DEFAULT_WATCHLIST_SYMBOLS = [
+  { name: 'Core Holdings', symbols: ['AAPL', 'MSFT', 'NVDA'] },
+  { name: 'Growth Radar', symbols: ['TSLA', 'SHOP', 'AMD'] }
+] as const;
+
+export const defaultWatchlists = async (
+  contextId = 'default_mock',
+  fetchImpl: typeof fetch = fetch
+): Promise<Watchlist[]> =>
+  Promise.all(
+    DEFAULT_WATCHLIST_SYMBOLS.map(async (item) => ({
+      id: uid(),
+      name: item.name,
+      tickers: await Promise.all(item.symbols.map((symbol) => buildTicker(symbol, contextId, fetchImpl)))
+    }))
+  );
+
+export const addTicker = async (
   watchlist: Watchlist,
-  ticker: Ticker,
-  alert: AlertRule,
-  currentPrice: number,
-  timestampMs: number
-): PriceNotification => {
-  const directionText = alert.direction === 'above' ? 'rose above' : 'fell below';
-  return {
-    id: uid(),
-    watchlistId: watchlist.id,
-    watchlistName: watchlist.name,
-    tickerId: ticker.id,
-    tickerSymbol: ticker.symbol,
-    alertId: alert.id,
-    direction: alert.direction,
-    threshold: alert.threshold,
-    currentPrice,
-    message: `${ticker.symbol} ${directionText} ${alert.threshold.toFixed(2)} (now ${currentPrice.toFixed(2)})`,
-    createdAt: new Date(timestampMs).toISOString(),
-    read: false
-  };
-};
-
-export const defaultWatchlists = (): Watchlist[] => [
-  {
-    id: uid(),
-    name: 'Core Holdings',
-    tickers: ['AAPL', 'MSFT', 'NVDA'].map(seedTicker)
-  },
-  {
-    id: uid(),
-    name: 'Growth Radar',
-    tickers: ['TSLA', 'SHOP', 'AMD'].map(seedTicker)
-  }
-];
-
-export const addTicker = (watchlist: Watchlist, symbol: string): Watchlist => ({
+  symbol: string,
+  contextId = 'default_mock',
+  fetchImpl: typeof fetch = fetch
+): Promise<Watchlist> => ({
   ...watchlist,
-  tickers: [...watchlist.tickers, seedTicker(symbol)]
+  tickers: [...watchlist.tickers, await buildTicker(symbol, contextId, fetchImpl)]
 });
 
 export const addAlert = (
@@ -138,6 +146,30 @@ export const toggleAlert = (ticker: Ticker, alertId: string): Ticker => ({
     alert.id === alertId ? { ...alert, enabled: !alert.enabled, triggered: false } : alert
   )
 });
+
+const buildNotification = (
+  watchlist: Watchlist,
+  ticker: Ticker,
+  alert: AlertRule,
+  currentPrice: number,
+  timestampMs: number
+): PriceNotification => {
+  const directionText = alert.direction === 'above' ? 'rose above' : 'fell below';
+  return {
+    id: uid(),
+    watchlistId: watchlist.id,
+    watchlistName: watchlist.name,
+    tickerId: ticker.id,
+    tickerSymbol: ticker.symbol,
+    alertId: alert.id,
+    direction: alert.direction,
+    threshold: alert.threshold,
+    currentPrice,
+    message: `${ticker.symbol} ${directionText} ${alert.threshold.toFixed(2)} (now ${currentPrice.toFixed(2)})`,
+    createdAt: new Date(timestampMs).toISOString(),
+    read: false
+  };
+};
 
 const nextChange = (existing: number, volatility: number) => {
   const move = (Math.random() - 0.5) * volatility;
@@ -178,9 +210,7 @@ export const tickWatchlistsWithNotifications = (
       );
 
       const alerts = ticker.alerts.map((alert) => {
-        if (!alert.enabled) {
-          return alert;
-        }
+        if (!alert.enabled) return alert;
         const hit =
           alert.direction === 'above' ? currentPrice >= alert.threshold : currentPrice <= alert.threshold;
 
@@ -195,10 +225,7 @@ export const tickWatchlistsWithNotifications = (
     })
   }));
 
-  return {
-    watchlists: nextWatchlists,
-    notifications
-  };
+  return { watchlists: nextWatchlists, notifications };
 };
 
 export const tickWatchlists = (watchlists: Watchlist[]): Watchlist[] =>

@@ -380,3 +380,14 @@ The ticker page accepts `?context=default_mock` or `?context=default_live` and s
 4. Open `/ticker/<symbol>?context=<your-context-id>` to use and compare it.
 
 This keeps external API concerns out of Svelte components and makes A/B testing provider stacks straightforward.
+
+## Dashboard watchlists now use active context pricing
+
+Default watchlists still seed the same ticker sets (`AAPL/MSFT/NVDA` and `TSLA/SHOP/AMD`), but ticker initialization now resolves price and initial change metadata through the **active dashboard context** (`default_mock` or `default_live`).
+
+- Context is selectable directly on the dashboard and persisted to `trade-desk-active-context-v1`.
+- `default_mock` uses local mock providers from `src/lib/analysis/providers/mock-providers.ts`.
+- `default_live` uses Yahoo providers from `src/lib/analysis/providers/live-providers.ts`.
+- New tickers added from the dashboard are initialized with the currently active context as well.
+
+This removes pricing mock-seeding from trading watchlist constructors and keeps provider logic centralized in the context/provider layer.
