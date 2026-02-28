@@ -17,8 +17,7 @@
   let selectedWatchlistId = watchlists[0]?.id ?? '';
   let newWatchlistName = '';
   let tickerSymbol = '';
-  let alertDirection: 'above' | 'below' = 'above';
-  let alertThreshold = '';
+  let alertDrafts: Record<string, { direction: 'above' | 'below'; threshold: string }> = {};
 
   const currency = new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -85,19 +84,52 @@
     persist();
   };
 
+  const getAlertDraft = (tickerId: string) =>
+    alertDrafts[tickerId] ?? {
+      direction: 'above' as const,
+      threshold: ''
+    };
+
+  const setAlertDirection = (tickerId: string, direction: 'above' | 'below') => {
+    alertDrafts = {
+      ...alertDrafts,
+      [tickerId]: {
+        ...getAlertDraft(tickerId),
+        direction
+      }
+    };
+  };
+
+  const setAlertThreshold = (tickerId: string, threshold: string) => {
+    alertDrafts = {
+      ...alertDrafts,
+      [tickerId]: {
+        ...getAlertDraft(tickerId),
+        threshold
+      }
+    };
+  };
+
   const createAlert = (ticker: Ticker) => {
-    const parsed = Number(alertThreshold);
+    const draft = getAlertDraft(ticker.id);
+    const parsed = Number(draft.threshold);
     if (Number.isNaN(parsed) || parsed <= 0 || !selectedWatchlist) return;
     watchlists = watchlists.map((watchlist) => {
       if (watchlist.id !== selectedWatchlist.id) return watchlist;
       return {
         ...watchlist,
         tickers: watchlist.tickers.map((t) =>
-          t.id === ticker.id ? addAlert(t, alertDirection, parsed) : t
+          t.id === ticker.id ? addAlert(t, draft.direction, parsed) : t
         )
       };
     });
-    alertThreshold = '';
+    alertDrafts = {
+      ...alertDrafts,
+      [ticker.id]: {
+        ...draft,
+        threshold: ''
+      }
+    };
     persist();
   };
 
@@ -223,11 +255,27 @@
                         {/each}
                       {/if}
                       <div class="inline">
-                        <select bind:value={alertDirection}>
+                        <select
+                          value={getAlertDraft(ticker.id).direction}
+                          on:change={(event) =>
+                            setAlertDirection(
+                              ticker.id,
+                              (event.currentTarget as HTMLSelectElement).value as 'above' | 'below'
+                            )}>
                           <option value="above">Above</option>
                           <option value="below">Below</option>
                         </select>
-                        <input bind:value={alertThreshold} type="number" min="0.01" step="0.01" placeholder="Price" />
+                        <input
+                          value={getAlertDraft(ticker.id).threshold}
+                          on:input={(event) =>
+                            setAlertThreshold(
+                              ticker.id,
+                              (event.currentTarget as HTMLInputElement).value
+                            )}
+                          type="number"
+                          min="0.01"
+                          step="0.01"
+                          placeholder="Price" />
                         <button on:click={() => createAlert(ticker)}>Set</button>
                       </div>
                     </div>
