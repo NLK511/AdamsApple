@@ -1,14 +1,39 @@
 # TradeDesk Advisor (SvelteKit)
 
-A clean and professional SvelteKit trading advisor UI that lets you:
+TradeDesk Advisor is a SvelteKit web app for monitoring watchlists, tracking simulated market movement, configuring threshold alerts, and opening per-ticker deep-dive analysis tabs.
 
-- Create and switch between multiple ticker watchlists.
-- Track current prices with daily/weekly/monthly/quarterly/yearly change snapshots.
-- Set threshold alerts for each ticker when price moves above or below a value.
-- Deliver alert notifications to an inbox with read/unread state that is auto-marked as read when viewed.
-- Persist watchlist and notification state in local storage.
-- Click any ticker to open a new tab with deep analysis (target consensus, sentiment, fundamentals, and entry/exit plans).
-- Swap and compare multiple analysis engines for fundamentals and entry logic.
+## Features
+
+- Multiple watchlists with add/switch workflows.
+- Ticker table with current price and daily/weekly/monthly/quarterly/yearly change buckets.
+- Price-threshold alerts (above/below) per ticker.
+- Notification inbox with read/unread state (auto-marked read when inbox is viewed).
+- Ticker detail tabs with pluggable analysis engines and side-by-side comparison:
+  - Target price consensus + analyst breakdown
+  - Sentiment analysis digest
+  - Fundamental analysis summary
+  - Buy/sell entry-exit planning
+
+---
+
+## Project structure
+
+- `src/routes/+page.svelte`
+  - Main dashboard (watchlists, alerts, inbox, ticker links)
+- `src/lib/trading.ts`
+  - Trading domain state + simulation + alert trigger + notification utilities
+- `src/routes/ticker/[symbol]/+page.ts`
+  - Route loader for ticker deep-dive page
+- `src/routes/ticker/[symbol]/+page.svelte`
+  - Ticker deep-dive UI
+- `src/lib/analysis/contracts.ts`
+  - Engine interfaces and report contracts
+- `src/lib/analysis/registry.ts`
+  - Default engine implementations + engine registry + report builder
+- `tests/*.test.mjs`
+  - Security, trading notifications, route behavior, and analysis engine tests
+
+---
 
 ## Run locally
 
@@ -17,17 +42,194 @@ npm install
 npm run dev
 ```
 
-Then open the local URL shown by Vite (typically `http://localhost:5173`).
+Then open the URL printed by Vite (usually `http://localhost:5173`).
 
-## Windows / WSL npm EPERM fix
+### Additional scripts
 
-If your repo is on a mounted Windows path (for example `/mnt/c/...`) and `npm install` fails with:
+```bash
+npm run check   # svelte-check type/diagnostics
+npm run test    # node test suite
+npm run build   # production build
+npm run preview # preview production build
+```
 
-- `EPERM: operation not permitted, chmod .../node_modules/@sveltejs/kit/svelte-kit.js`
+---
 
-this project includes `.npmrc` with `bin-links=false` so npm does not create chmod-dependent bin links on mounted filesystems.
+## Data sources and APIs (default behavior)
 
-The npm scripts in `package.json` call CLI entry points through `node ./node_modules/...` directly, so they continue to work without `.bin` symlinks.
+### Important: current default is **fully local, deterministic mock logic**
+
+By default, the app does **not** call external market/news APIs for ticker metadata in the detail tab.
+
+Current default sources:
+
+1. **Dashboard prices & changes**
+   - Source: local simulation in `src/lib/trading.ts`
+   - Function: `tickWatchlistsWithNotifications(...)` and helpers
+
+2. **Target consensus, sentiment, fundamentals, entry/exit plans**
+   - Source: local model logic in `src/lib/analysis/registry.ts`
+   - Functions:
+     - `buildTargetConsensus(...)`
+     - `buildSentimentDigest(...)`
+     - `buildTickerReport(...)`
+
+3. **Notifications**
+   - Source: alert state transitions in local simulation
+   - Storage: browser `localStorage`
+
+### Storage keys used by the app
+
+- `trade-desk-watchlists-v1`
+- `trade-desk-notifications-v1`
+
+These are explicitly validated by the security tests.
+
+---
+
+## How to plug/modify sentiment analysis logic
+
+Sentiment logic is intentionally engine-friendly through contracts and centralized registry composition.
+
+### 1) Contract (already defined)
+
+`src/lib/analysis/contracts.ts` defines `SentimentDigest` shape used by the UI/report.
+
+### 2) Default implementation
+
+The default builder is in `src/lib/analysis/registry.ts`:
+
+- `buildSentimentDigest(symbol)`
+
+### 3) Recommended extension pattern
+
+To support multiple sentiment engines (e.g., X-only vs FT-weighted vs LLM classifier), introduce a dedicated sentiment engine interface in `contracts.ts` and wire it into `registry.ts` similarly to fundamental/entry engines.
+
+Suggested interface pattern:
+
+```ts
+export interface SentimentModel {
+  id: string;
+  name: string;
+  summarize(symbol: string): SentimentDigest;
+}
+```
+
+Then:
+
+- Add a `sentimentModels` array in `registry.ts`
+- Add `getSentimentModel(id)` fallback selector
+- Pass selected sentiment model into `buildTickerReport(...)`
+- Add query-param selection in `src/routes/ticker/[symbol]/+page.ts`
+- Add dropdown in `src/routes/ticker/[symbol]/+page.svelte`
+
+### 4) Testing guidance
+
+Add tests in `tests/analysis-engines.test.mjs` to assert:
+
+- model switch changes digest outputs
+- required channels are present (if mandated)
+- fallback behavior on unknown model IDs
+
+---
+
+## How to plug/modify entry-point calculation logic
+
+Entry/exit strategy logic is already pluggable.
+
+### Existing contract
+
+In `src/lib/analysis/contracts.ts`:
+
+- `EntryPointModel`
+- `EntryPlan`
+
+### Existing registry and models
+
+In `src/lib/analysis/registry.ts`:
+
+- `entryPointModels`
+- `getEntryPointModel(id)`
+- default models:
+  - `swing-structure`
+  - `momentum-breakout`
+
+### Add a new entry model
+
+1. Implement a new `EntryPointModel` object in `registry.ts`.
+2. Add it to `entryPointModels`.
+3. Ensure output fields are complete:
+   - `buyZone`, `sellZone`, `stopLoss`, `takeProfit`, `rationale`
+4. Validate with tests in `tests/analysis-engines.test.mjs`:
+   - different outputs from other models
+   - stable fallback behavior
+
+---
+
+## How to plug/modify fundamental analysis logic
+
+Fundamental summary is already pluggable.
+
+### Existing contract
+
+In `src/lib/analysis/contracts.ts`:
+
+- `FundamentalModel`
+- `FundamentalSummary`
+
+### Existing registry and models
+
+In `src/lib/analysis/registry.ts`:
+
+- `fundamentalModels`
+- `getFundamentalModel(id)`
+- default models:
+  - `dcf-core`
+  - `quality-factors`
+
+### Add a new fundamental model
+
+1. Implement a new `FundamentalModel` object.
+2. Add it to `fundamentalModels`.
+3. Return complete summary payload:
+   - `summary`, `strengths`, `risks`, `valuationNote`
+4. Add/extend tests to compare model differentiation.
+
+---
+
+## Integrating real external APIs (optional)
+
+If you want live APIs (market data/news/analyst endpoints), keep provider logic isolated from UI:
+
+1. Create provider modules in `src/lib/analysis/providers/` (e.g. `marketProvider.ts`, `newsProvider.ts`).
+2. Define provider interfaces (fetch methods + normalized return types).
+3. Inject providers into engine functions (or load-layer composition), instead of calling APIs directly in Svelte components.
+4. Use env vars for API keys and base URLs.
+
+### Suggested environment variables
+
+```bash
+PUBLIC_MARKET_DATA_API_BASE_URL=
+MARKET_DATA_API_KEY=
+PUBLIC_NEWS_API_BASE_URL=
+NEWS_API_KEY=
+PUBLIC_ANALYST_API_BASE_URL=
+ANALYST_API_KEY=
+```
+
+> Notes:
+> - Prefix with `PUBLIC_` only for values safe to expose client-side.
+> - Keep secrets server-side where possible via SvelteKit server/load endpoints.
+
+### Recommended source mapping (when enabling real APIs)
+
+- Ticker quotes + changes: market data provider
+- Analyst target breakdown: analyst estimates provider
+- Sentiment raw inputs: X/news provider + FT/news provider
+- Fundamentals raw metrics: financial statements provider
+- Entry calculations: internal model logic over normalized market data
+
+---
 
 ## Security-focused tests
 
@@ -37,10 +239,23 @@ Run:
 npm run test
 ```
 
-This includes static security checks that fail if the app source introduces high-risk patterns such as:
+Security tests include guards against:
 
 - dynamic code execution (`eval`, `new Function`)
 - unsafe HTML sinks (`innerHTML`, `outerHTML`, `insertAdjacentHTML`)
-- process or filesystem access in app source (`child_process`, `fs`)
-- common prompt-injection / agent-threat surfaces (message handlers, wildcard `postMessage`, dynamic `fetch` targets)
-- localStorage access outside authorized app keys (`trade-desk-watchlists-v1`, `trade-desk-notifications-v1`)
+- process/filesystem access in app source (`child_process`, `fs`)
+- prompt-injection/agent-risk surfaces (message handlers, wildcard `postMessage`, dynamic fetch targets)
+- localStorage usage outside authorized keys
+
+---
+
+## Windows / WSL npm EPERM fix
+
+If the repo lives on `/mnt/c/...` and `npm install` fails with chmod/EPERM issues,
+`.npmrc` includes:
+
+```ini
+bin-links=false
+```
+
+Scripts invoke binaries via `node ./node_modules/...` directly so development still works without `.bin` symlink creation.
