@@ -7,6 +7,8 @@ A clean and professional SvelteKit trading advisor UI that lets you:
 - Set threshold alerts for each ticker when price moves above or below a value.
 - Deliver alert notifications to an inbox with read/unread state that is auto-marked as read when viewed.
 - Persist watchlist and notification state in local storage.
+- Click any ticker to open a new tab with deep analysis (target consensus, sentiment, fundamentals, and entry/exit plans).
+- Swap and compare multiple analysis engines for fundamentals and entry logic.
 
 ## Run locally
 

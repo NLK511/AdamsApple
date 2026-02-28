@@ -317,7 +317,7 @@
             <tbody>
               {#each selectedWatchlist.tickers as ticker}
                 <tr>
-                  <td class="symbol">{ticker.symbol}</td>
+                  <td class="symbol"><a href={`/ticker/${ticker.symbol}`} target="_blank" rel="noopener noreferrer">{ticker.symbol}</a></td>
                   <td>{currency.format(ticker.currentPrice)}</td>
                   <td class:up={ticker.changes.daily >= 0} class:down={ticker.changes.daily < 0}>{signed.format(ticker.changes.daily)}%</td>
                   <td class:up={ticker.changes.weekly >= 0} class:down={ticker.changes.weekly < 0}>{signed.format(ticker.changes.weekly)}%</td>
@@ -556,6 +556,15 @@
   .symbol {
     font-weight: 700;
     letter-spacing: 0.02em;
+  }
+
+  .symbol a {
+    color: #1d4ed8;
+    text-decoration: none;
+  }
+
+  .symbol a:hover {
+    text-decoration: underline;
   }
 
   .up {
