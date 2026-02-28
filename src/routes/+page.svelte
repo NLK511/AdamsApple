@@ -100,6 +100,10 @@
     };
   };
 
+
+  const normalizeDirection = (value: string): 'above' | 'below' =>
+    value === 'below' ? 'below' : 'above';
+
   const setAlertThreshold = (tickerId: string, threshold: string) => {
     alertDrafts = {
       ...alertDrafts,
@@ -108,6 +112,17 @@
         threshold
       }
     };
+  };
+
+
+  const onAlertDirectionChange = (tickerId: string, event: Event) => {
+    const target = event.currentTarget as HTMLSelectElement | null;
+    setAlertDirection(tickerId, normalizeDirection(target?.value ?? 'above'));
+  };
+
+  const onAlertThresholdInput = (tickerId: string, event: Event) => {
+    const target = event.currentTarget as HTMLInputElement | null;
+    setAlertThreshold(tickerId, target?.value ?? '');
   };
 
   const createAlert = (ticker: Ticker) => {
@@ -257,21 +272,13 @@
                       <div class="inline">
                         <select
                           value={getAlertDraft(ticker.id).direction}
-                          on:change={(event) =>
-                            setAlertDirection(
-                              ticker.id,
-                              (event.currentTarget as HTMLSelectElement).value as 'above' | 'below'
-                            )}>
+                          on:change={(event) => onAlertDirectionChange(ticker.id, event)}>
                           <option value="above">Above</option>
                           <option value="below">Below</option>
                         </select>
                         <input
                           value={getAlertDraft(ticker.id).threshold}
-                          on:input={(event) =>
-                            setAlertThreshold(
-                              ticker.id,
-                              (event.currentTarget as HTMLInputElement).value
-                            )}
+                          on:input={(event) => onAlertThresholdInput(ticker.id, event)}
                           type="number"
                           min="0.01"
                           step="0.01"
