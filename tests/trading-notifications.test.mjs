@@ -58,6 +58,7 @@ const baseWatchlist = (alertOverrides = {}) => [{
         quarterly: 0,
         yearly: 0
       },
+      providerWarnings: [],
       alerts: [
         {
           id: 'al-1',

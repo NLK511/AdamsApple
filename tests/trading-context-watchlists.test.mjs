@@ -43,6 +43,7 @@ test('defaultWatchlists use default_mock provider-derived prices and keep seeded
   assert.deepEqual(watchlists[0].tickers.map((ticker) => ticker.symbol), ['AAPL', 'MSFT', 'NVDA']);
   assert.deepEqual(watchlists[1].tickers.map((ticker) => ticker.symbol), ['TSLA', 'SHOP', 'AMD']);
   assert.ok(watchlists.every((w) => w.tickers.every((ticker) => ticker.currentPrice > 0)));
+  assert.ok(watchlists.every((w) => w.tickers.every((ticker) => (ticker.providerWarnings ?? []).length === 0)));
 });
 
 test('defaultWatchlists use active live context providers for price and changes metadata', async () => {
@@ -91,4 +92,17 @@ test('addTicker uses currently active context for new ticker values', async () =
   assert.equal(updated.tickers.length, 1);
   assert.equal(updated.tickers[0].symbol, 'CRM');
   assert.equal(updated.tickers[0].currentPrice, 456.78);
+});
+
+
+test('live context surfaces provider warnings instead of substituting mock price', async () => {
+  const trading = await loadTrading();
+
+  const failingFetch = async () => new Response('{}', { status: 503 });
+  const watchlists = await trading.defaultWatchlists('default_live', failingFetch);
+  const sample = watchlists[0].tickers[0];
+
+  assert.equal(sample.currentPrice, 0);
+  assert.ok(sample.providerWarnings.some((warning) => warning.includes('Price unavailable')));
+  assert.ok(sample.providerWarnings.some((warning) => warning.includes('No signals returned')));
 });

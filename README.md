@@ -376,3 +376,9 @@ Default watchlists still seed the same ticker sets (`AAPL/MSFT/NVDA` and `TSLA/S
 - New tickers added from the dashboard are initialized with the currently active context as well.
 
 This removes pricing mock-seeding from trading watchlist constructors and keeps provider logic centralized in the context/provider layer.
+
+## Provider failures and warning UI
+
+Provider failures no longer silently fall back to mock values in live mode.
+When a ticker bootstrap call cannot retrieve price/news from its active context provider, the app stores provider warnings on that ticker and shows a ⚠️ icon in the dashboard row.
+Clicking the icon opens the warning list so you can inspect current fetch/provider issues.

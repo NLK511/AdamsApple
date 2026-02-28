@@ -3,7 +3,6 @@
  * Centralizes state shapes and pure update helpers used by dashboard UI.
  */
 import { getAnalysisContext } from './analysis/contexts';
-import { anchorPrice } from './analysis/providers/mock-providers';
 
 export type ChangeBucket = 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
 
@@ -21,6 +20,7 @@ export interface Ticker {
   currentPrice: number;
   changes: Record<ChangeBucket, number>;
   alerts: AlertRule[];
+  providerWarnings: string[];
 }
 
 export interface Watchlist {
@@ -60,13 +60,6 @@ const scoreToChanges = (score: number): Record<ChangeBucket, number> => ({
   yearly: Number((score * 7.5).toFixed(2))
 });
 
-const fallbackChanges = (symbol: string, price: number): Record<ChangeBucket, number> => {
-  const seed = [...symbol].reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  const base = ((seed % 11) - 5) / 2;
-  const drift = price > 250 ? 0.4 : -0.2;
-  return scoreToChanges(Number((base + drift).toFixed(2)));
-};
-
 const buildTicker = async (
   symbol: string,
   contextId = 'default_mock',
@@ -74,19 +67,49 @@ const buildTicker = async (
 ): Promise<Ticker> => {
   const normalized = symbol.toUpperCase();
   const context = getAnalysisContext(contextId);
-  const providerPrice = await context.tickerPriceProvider.fetchPrice(normalized, fetchImpl);
-  const currentPrice = Number((providerPrice ?? anchorPrice(normalized)).toFixed(2));
+  const providerWarnings: string[] = [];
 
-  const signals = await context.newsProvider.fetchSignals(normalized, fetchImpl);
+  let providerPrice: number | null = null;
+  try {
+    providerPrice = await context.tickerPriceProvider.fetchPrice(normalized, fetchImpl);
+  } catch (error) {
+    providerWarnings.push(`Price provider error: ${error instanceof Error ? error.message : 'unknown error'}`);
+  }
+  if (!Number.isFinite(providerPrice)) {
+    providerWarnings.push(`Price unavailable from ${context.tickerPriceProvider.id}.`);
+  }
+  const currentPrice = Number.isFinite(providerPrice)
+    ? Number((providerPrice as number).toFixed(2))
+    : 0;
+
+  let signals = [] as Array<{ source: 'X' | 'Financial Times'; signal: string; confidence: number }>;
+  try {
+    signals = await context.newsProvider.fetchSignals(normalized, fetchImpl);
+  } catch (error) {
+    providerWarnings.push(`News provider error: ${error instanceof Error ? error.message : 'unknown error'}`);
+  }
+  if (signals.length === 0) {
+    providerWarnings.push(`No signals returned from ${context.newsProvider.id}.`);
+  }
+
   const sentiment = context.sentimentEngine.build(normalized, signals);
-  const changes = signals.length > 0 ? scoreToChanges(sentiment.score) : fallbackChanges(normalized, currentPrice);
+  const changes = signals.length > 0
+    ? scoreToChanges(sentiment.score)
+    : {
+        daily: 0,
+        weekly: 0,
+        monthly: 0,
+        quarterly: 0,
+        yearly: 0
+      };
 
   return {
     id: uid(),
     symbol: normalized,
     currentPrice,
     changes,
-    alerts: []
+    alerts: [],
+    providerWarnings
   };
 };
 
@@ -221,7 +244,7 @@ export const tickWatchlistsWithNotifications = (
         return { ...alert, triggered: hit };
       });
 
-      return { ...ticker, currentPrice, changes, alerts };
+      return { ...ticker, currentPrice, changes, alerts, providerWarnings: ticker.providerWarnings ?? [] };
     })
   }));
 

@@ -128,6 +128,8 @@
     }
   };
 
+  let expandedWarningsTickerId = '';
+
   const openNotification = (notificationId: string) => {
     notifications = markNotificationRead(notifications, notificationId);
     persist();
@@ -209,6 +211,10 @@
   const onAlertThresholdInput = (tickerId: string, event: Event) => {
     const target = event.currentTarget as HTMLInputElement | null;
     setAlertThreshold(tickerId, target?.value ?? '');
+  };
+
+  const toggleWarnings = (tickerId: string) => {
+    expandedWarningsTickerId = expandedWarningsTickerId === tickerId ? '' : tickerId;
   };
 
   const createAlert = (ticker: Ticker) => {
@@ -370,7 +376,12 @@
             <tbody>
               {#each selectedWatchlist.tickers as ticker}
                 <tr>
-                  <td class="symbol"><a href={`/ticker/${ticker.symbol}`} target="_blank" rel="noopener noreferrer">{ticker.symbol}</a></td>
+                  <td class="symbol">
+                    <a href={`/ticker/${ticker.symbol}`} target="_blank" rel="noopener noreferrer">{ticker.symbol}</a>
+                    {#if (ticker.providerWarnings?.length ?? 0) > 0}
+                      <button class="warning-btn" aria-label="Provider warnings" title="Provider warnings" on:click={() => toggleWarnings(ticker.id)}>⚠️</button>
+                    {/if}
+                  </td>
                   <td>{currency.format(ticker.currentPrice)}</td>
                   <td class:up={ticker.changes.daily >= 0} class:down={ticker.changes.daily < 0}>{signed.format(ticker.changes.daily)}%</td>
                   <td class:up={ticker.changes.weekly >= 0} class:down={ticker.changes.weekly < 0}>{signed.format(ticker.changes.weekly)}%</td>
@@ -408,6 +419,17 @@
                           placeholder="Price" />
                         <button on:click={() => createAlert(ticker)}>Set</button>
                       </div>
+
+                      {#if expandedWarningsTickerId === ticker.id && (ticker.providerWarnings?.length ?? 0) > 0}
+                        <div class="warning-panel">
+                          <strong>Provider warnings</strong>
+                          <ul>
+                            {#each (ticker.providerWarnings ?? []) as warning}
+                              <li>{warning}</li>
+                            {/each}
+                          </ul>
+                        </div>
+                      {/if}
                     </div>
                   </td>
                 </tr>
@@ -619,6 +641,32 @@
   .symbol a:hover {
     text-decoration: underline;
   }
+
+
+  .warning-btn {
+    margin-left: 0.45rem;
+    background: #fff7ed;
+    border-color: #fdba74;
+    color: #9a3412;
+    padding: 0.12rem 0.35rem;
+    line-height: 1;
+  }
+
+  .warning-panel {
+    margin-top: 0.5rem;
+    background: #fffbeb;
+    border: 1px solid #fcd34d;
+    border-radius: 8px;
+    padding: 0.45rem 0.55rem;
+    color: #92400e;
+    font-size: 0.82rem;
+  }
+
+  .warning-panel ul {
+    margin: 0.35rem 0 0;
+    padding-left: 1rem;
+  }
+
 
   .up {
     color: #0f766e;

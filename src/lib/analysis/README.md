@@ -7,3 +7,4 @@ The trading dashboard now consumes the same context catalog when seeding default
 This guarantees ticker bootstrap pricing/metadata always come from the active context instead of ad-hoc random seeding.
 
 Live Yahoo integration is proxy-first via `/api/providers/yahoo/*` SvelteKit routes to avoid browser CORS issues.
+Live context provider failures are surfaced to dashboard ticker warnings instead of being silently replaced with mock values.
