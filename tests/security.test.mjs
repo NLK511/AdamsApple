@@ -68,12 +68,13 @@ test('app source includes no common prompt-injection / agent-threat sinks', () =
   }
 });
 
-test('localStorage usage is constrained to authorized STORAGE_KEY only', () => {
+test('localStorage usage is constrained to authorized storage keys only', () => {
   const pagePath = 'src/routes/+page.svelte';
   const pageSource = sourceByFile.get(pagePath);
 
   assert.ok(pageSource, `${pagePath} should exist`);
   assert.match(pageSource, /const\s+STORAGE_KEY\s*=\s*['"]trade-desk-watchlists-v1['"]/);
+  assert.match(pageSource, /const\s+NOTIFICATION_STORAGE_KEY\s*=\s*['"]trade-desk-notifications-v1['"]/);
 
   const localStorageCalls = [...pageSource.matchAll(/localStorage\.(getItem|setItem|removeItem)\(([^)]*)\)/g)];
   assert.ok(localStorageCalls.length > 0, 'expected localStorage usage to be present');
@@ -81,8 +82,8 @@ test('localStorage usage is constrained to authorized STORAGE_KEY only', () => {
   for (const [, method, args] of localStorageCalls) {
     assert.match(
       args,
-      /\bSTORAGE_KEY\b/,
-      `localStorage.${method} must only use STORAGE_KEY, got args: ${args.trim()}`
+      /\b(STORAGE_KEY|NOTIFICATION_STORAGE_KEY)\b/,
+      `localStorage.${method} must only use authorized keys, got args: ${args.trim()}`
     );
   }
 });

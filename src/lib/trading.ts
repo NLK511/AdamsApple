@@ -22,6 +22,26 @@ export interface Watchlist {
   tickers: Ticker[];
 }
 
+export interface PriceNotification {
+  id: string;
+  watchlistId: string;
+  watchlistName: string;
+  tickerId: string;
+  tickerSymbol: string;
+  alertId: string;
+  direction: 'above' | 'below';
+  threshold: number;
+  currentPrice: number;
+  message: string;
+  createdAt: string;
+  read: boolean;
+}
+
+interface TickResult {
+  watchlists: Watchlist[];
+  notifications: PriceNotification[];
+}
+
 const buckets: ChangeBucket[] = ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'];
 
 const uid = () => Math.random().toString(36).slice(2, 10);
@@ -40,6 +60,30 @@ const seedTicker = (symbol: string): Ticker => {
       yearly: Number((Math.random() * 65 - 20).toFixed(2))
     },
     alerts: []
+  };
+};
+
+const buildNotification = (
+  watchlist: Watchlist,
+  ticker: Ticker,
+  alert: AlertRule,
+  currentPrice: number,
+  timestampMs: number
+): PriceNotification => {
+  const directionText = alert.direction === 'above' ? 'rose above' : 'fell below';
+  return {
+    id: uid(),
+    watchlistId: watchlist.id,
+    watchlistName: watchlist.name,
+    tickerId: ticker.id,
+    tickerSymbol: ticker.symbol,
+    alertId: alert.id,
+    direction: alert.direction,
+    threshold: alert.threshold,
+    currentPrice,
+    message: `${ticker.symbol} ${directionText} ${alert.threshold.toFixed(2)} (now ${currentPrice.toFixed(2)})`,
+    createdAt: new Date(timestampMs).toISOString(),
+    read: false
   };
 };
 
@@ -96,31 +140,38 @@ const nextChange = (existing: number, volatility: number) => {
   return Number((existing * 0.92 + move).toFixed(2));
 };
 
-export const tickWatchlists = (watchlists: Watchlist[]): Watchlist[] =>
-  watchlists.map((watchlist) => ({
+export const tickWatchlistsWithNotifications = (
+  watchlists: Watchlist[],
+  timestampMs = Date.now()
+): TickResult => {
+  const notifications: PriceNotification[] = [];
+
+  const nextWatchlists = watchlists.map((watchlist) => ({
     ...watchlist,
     tickers: watchlist.tickers.map((ticker) => {
       const priceDelta = (Math.random() - 0.5) * Math.max(0.35, ticker.currentPrice * 0.0125);
       const currentPrice = Number(Math.max(0.2, ticker.currentPrice + priceDelta).toFixed(2));
 
-      const changes = buckets.reduce<Record<ChangeBucket, number>>((acc, bucket) => {
-        const volatilityMap: Record<ChangeBucket, number> = {
-          daily: 2,
-          weekly: 4,
-          monthly: 6,
-          quarterly: 8,
-          yearly: 12
-        };
-        acc[bucket] = nextChange(ticker.changes[bucket], volatilityMap[bucket]);
-        return acc;
-      },
-      {
-        daily: 0,
-        weekly: 0,
-        monthly: 0,
-        quarterly: 0,
-        yearly: 0
-      });
+      const changes = buckets.reduce<Record<ChangeBucket, number>>(
+        (acc, bucket) => {
+          const volatilityMap: Record<ChangeBucket, number> = {
+            daily: 2,
+            weekly: 4,
+            monthly: 6,
+            quarterly: 8,
+            yearly: 12
+          };
+          acc[bucket] = nextChange(ticker.changes[bucket], volatilityMap[bucket]);
+          return acc;
+        },
+        {
+          daily: 0,
+          weekly: 0,
+          monthly: 0,
+          quarterly: 0,
+          yearly: 0
+        }
+      );
 
       const alerts = ticker.alerts.map((alert) => {
         if (!alert.enabled) {
@@ -128,9 +179,37 @@ export const tickWatchlists = (watchlists: Watchlist[]): Watchlist[] =>
         }
         const hit =
           alert.direction === 'above' ? currentPrice >= alert.threshold : currentPrice <= alert.threshold;
+
+        if (hit && !alert.triggered) {
+          notifications.push(buildNotification(watchlist, ticker, alert, currentPrice, timestampMs));
+        }
+
         return { ...alert, triggered: hit };
       });
 
       return { ...ticker, currentPrice, changes, alerts };
     })
   }));
+
+  return {
+    watchlists: nextWatchlists,
+    notifications
+  };
+};
+
+export const tickWatchlists = (watchlists: Watchlist[]): Watchlist[] =>
+  tickWatchlistsWithNotifications(watchlists).watchlists;
+
+export const markAllNotificationsRead = (notifications: PriceNotification[]): PriceNotification[] =>
+  notifications.map((notification) => ({ ...notification, read: true }));
+
+export const markNotificationRead = (
+  notifications: PriceNotification[],
+  notificationId: string
+): PriceNotification[] =>
+  notifications.map((notification) =>
+    notification.id === notificationId ? { ...notification, read: true } : notification
+  );
+
+export const unreadNotificationCount = (notifications: PriceNotification[]): number =>
+  notifications.filter((notification) => !notification.read).length;

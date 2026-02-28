@@ -4,22 +4,27 @@
     addAlert,
     addTicker,
     defaultWatchlists,
+    markAllNotificationsRead,
+    markNotificationRead,
     removeAlert,
-    tickWatchlists,
+    tickWatchlistsWithNotifications,
     toggleAlert,
+    unreadNotificationCount,
+    type PriceNotification,
     type Ticker,
     type Watchlist
   } from '$lib/trading';
 
   const STORAGE_KEY = 'trade-desk-watchlists-v1';
+  const NOTIFICATION_STORAGE_KEY = 'trade-desk-notifications-v1';
 
   let watchlists: Watchlist[] = defaultWatchlists();
+  let notifications: PriceNotification[] = [];
+  let showInbox = false;
   let selectedWatchlistId = watchlists[0]?.id ?? '';
   let newWatchlistName = '';
   let tickerSymbol = '';
-
   let alertDrafts: Record<string, { direction: 'above' | 'below'; threshold: string }> = {};
-
 
   const currency = new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -47,9 +52,25 @@
       }
     }
 
+    const rawNotifications = localStorage.getItem(NOTIFICATION_STORAGE_KEY);
+    if (rawNotifications) {
+      try {
+        const parsedNotifications = JSON.parse(rawNotifications) as PriceNotification[];
+        if (Array.isArray(parsedNotifications)) {
+          notifications = parsedNotifications;
+        }
+      } catch {
+        localStorage.removeItem(NOTIFICATION_STORAGE_KEY);
+      }
+    }
+
     const handle = setInterval(() => {
-      watchlists = tickWatchlists(watchlists);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(watchlists));
+      const result = tickWatchlistsWithNotifications(watchlists);
+      watchlists = result.watchlists;
+      if (result.notifications.length > 0) {
+        notifications = [...result.notifications, ...notifications];
+      }
+      persist();
     }, 2800);
 
     window.addEventListener('beforeunload', () => clearInterval(handle));
@@ -57,11 +78,29 @@
 
   $: selectedWatchlist =
     watchlists.find((watchlist) => watchlist.id === selectedWatchlistId) ?? watchlists[0] ?? null;
-  $: triggeredCount = watchlists.flatMap((watchlist) => watchlist.tickers).flatMap((t) => t.alerts).filter((a) => a.triggered).length;
+  $: triggeredCount = watchlists
+    .flatMap((watchlist) => watchlist.tickers)
+    .flatMap((t) => t.alerts)
+    .filter((a) => a.triggered).length;
+  $: unreadCount = unreadNotificationCount(notifications);
 
   const persist = () => {
     if (!browser) return;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(watchlists));
+    localStorage.setItem(NOTIFICATION_STORAGE_KEY, JSON.stringify(notifications));
+  };
+
+  const toggleInbox = () => {
+    showInbox = !showInbox;
+    if (showInbox && unreadCount > 0) {
+      notifications = markAllNotificationsRead(notifications);
+      persist();
+    }
+  };
+
+  const openNotification = (notificationId: string) => {
+    notifications = markNotificationRead(notifications, notificationId);
+    persist();
   };
 
   const createWatchlist = () => {
@@ -86,7 +125,6 @@
     persist();
   };
 
-
   const getAlertDraft = (tickerId: string) =>
     alertDrafts[tickerId] ?? {
       direction: 'above' as const,
@@ -103,7 +141,6 @@
     };
   };
 
-
   const normalizeDirection = (value: string): 'above' | 'below' =>
     value === 'below' ? 'below' : 'above';
 
@@ -116,7 +153,6 @@
       }
     };
   };
-
 
   const onAlertDirectionChange = (tickerId: string, event: Event) => {
     const target = event.currentTarget as HTMLSelectElement | null;
@@ -137,7 +173,6 @@
       return {
         ...watchlist,
         tickers: watchlist.tickers.map((t) =>
-
           t.id === ticker.id ? addAlert(t, draft.direction, parsed) : t
         )
       };
@@ -183,8 +218,18 @@
 
 <main>
   <section class="hero">
-    <h1>TradeDesk Advisor</h1>
-    <p>Monitor curated watchlists, track price momentum, and react quickly with threshold alerts.</p>
+    <div class="hero-top">
+      <div>
+        <h1>TradeDesk Advisor</h1>
+        <p>Monitor curated watchlists, track price momentum, and react quickly with threshold alerts.</p>
+      </div>
+      <button class="inbox-toggle" on:click={toggleInbox}>
+        Inbox
+        {#if unreadCount > 0}
+          <span class="badge">{unreadCount}</span>
+        {/if}
+      </button>
+    </div>
     <div class="stats">
       <article>
         <span>{watchlists.length}</span>
@@ -200,6 +245,27 @@
       </article>
     </div>
   </section>
+
+  {#if showInbox}
+    <section class="inbox">
+      <h2>Notification Inbox</h2>
+      {#if notifications.length === 0}
+        <p class="empty">No notifications yet. Alerts will appear here when thresholds are crossed.</p>
+      {:else}
+        <ul>
+          {#each notifications as notification}
+            <li class:unread={!notification.read}>
+              <button on:click={() => openNotification(notification.id)}>
+                <strong>{notification.tickerSymbol}</strong>
+                <span>{notification.message}</span>
+                <small>{new Date(notification.createdAt).toLocaleString()}</small>
+              </button>
+            </li>
+          {/each}
+        </ul>
+      {/if}
+    </section>
+  {/if}
 
   <section class="controls">
     <div class="control-group">
@@ -318,6 +384,7 @@
   }
 
   .hero,
+  .inbox,
   .controls,
   .table-panel {
     background: rgba(255, 255, 255, 0.92);
@@ -325,6 +392,13 @@
     border-radius: 16px;
     padding: 1.2rem 1.25rem;
     box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+  }
+
+  .hero-top {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: center;
   }
 
   .hero h1 {
@@ -335,6 +409,60 @@
   .hero p {
     margin: 0.4rem 0 1rem;
     color: #334155;
+  }
+
+  .inbox-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+  }
+
+  .badge {
+    background: #dc2626;
+    color: white;
+    border-radius: 999px;
+    min-width: 1.35rem;
+    height: 1.35rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    padding: 0 0.35rem;
+  }
+
+  .inbox ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.6rem;
+  }
+
+  .inbox li {
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .inbox li.unread {
+    border-color: #a5b4fc;
+    box-shadow: 0 0 0 1px #a5b4fc inset;
+  }
+
+  .inbox li button {
+    width: 100%;
+    text-align: left;
+    border: 0;
+    background: #f8fafc;
+    color: #0f172a;
+    padding: 0.7rem 0.8rem;
+    display: grid;
+    gap: 0.18rem;
+    cursor: pointer;
+  }
+
+  .inbox li button small {
+    color: #64748b;
   }
 
   .stats {
@@ -395,7 +523,8 @@
     font-weight: 600;
   }
 
-  .table-panel h2 {
+  .table-panel h2,
+  .inbox h2 {
     margin: 0 0 0.75rem;
   }
 
@@ -472,12 +601,14 @@
   }
 
   @media (max-width: 980px) {
-    .controls {
+    .controls,
+    .stats {
       grid-template-columns: 1fr;
     }
 
-    .stats {
-      grid-template-columns: 1fr;
+    .hero-top {
+      flex-direction: column;
+      align-items: flex-start;
     }
   }
 </style>
