@@ -17,7 +17,9 @@
   let selectedWatchlistId = watchlists[0]?.id ?? '';
   let newWatchlistName = '';
   let tickerSymbol = '';
+
   let alertDrafts: Record<string, { direction: 'above' | 'below'; threshold: string }> = {};
+
 
   const currency = new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -84,6 +86,7 @@
     persist();
   };
 
+
   const getAlertDraft = (tickerId: string) =>
     alertDrafts[tickerId] ?? {
       direction: 'above' as const,
@@ -134,6 +137,7 @@
       return {
         ...watchlist,
         tickers: watchlist.tickers.map((t) =>
+
           t.id === ticker.id ? addAlert(t, draft.direction, parsed) : t
         )
       };

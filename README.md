@@ -41,3 +41,4 @@ This includes static security checks that fail if the app source introduces high
 - process or filesystem access in app source (`child_process`, `fs`)
 - common prompt-injection / agent-threat surfaces (message handlers, wildcard `postMessage`, dynamic `fetch` targets)
 - localStorage access outside the authorized app key (`trade-desk-watchlists-v1`)
+
