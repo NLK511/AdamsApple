@@ -8,7 +8,8 @@ import {
   defaultFundamentalModels,
   defaultSentimentEngines
 } from './engines';
-import { yahooNewsProvider, yahooTickerPriceProvider } from './providers/live-providers';
+import { tickerPriceProvider } from './providers/default-providers';
+import { yahooNewsProvider } from './providers/yahoo-providers';
 import { mockNewsProvider, mockTickerPriceProvider } from './providers/mock-providers';
 
 export const analysisContexts: AnalysisContext[] = [
@@ -23,9 +24,9 @@ export const analysisContexts: AnalysisContext[] = [
   },
   {
     id: 'default_live',
-    name: 'Default Live Context (Yahoo)',
+    name: 'Default Live Context ',
     newsProvider: yahooNewsProvider,
-    tickerPriceProvider: yahooTickerPriceProvider,
+    tickerPriceProvider: tickerPriceProvider,
     sentimentEngine: defaultSentimentEngines[0],
     fundamentalModels: defaultFundamentalModels,
     entryPointModels: defaultEntryPointModels

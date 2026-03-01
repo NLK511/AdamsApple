@@ -4,42 +4,19 @@
  */
 import type { NewsProvider, NewsSignal, TickerPriceProvider } from '../contracts';
 
-export interface LiveProviderConfig {
-  yahooQuoteProxyUrl: string;
-  yahooSearchProxyUrl: string;
-}
 
-export const defaultLiveProviderConfig: LiveProviderConfig = {
-  yahooQuoteProxyUrl: '/api/providers/yahoo/quote',
-  yahooSearchProxyUrl: '/api/providers/yahoo/search'
-};
+const  yahooSearchProxyUrl = '/api/providers/yahoo/search'
 
 const parseSource = (publisher: string): NewsSignal['source'] =>
   /financial\s*times/i.test(publisher) ? 'Financial Times' : 'X';
 
-export const fetchYahooPrice = async (
-  symbol: string,
-  fetchImpl: typeof fetch,
-  config = defaultLiveProviderConfig
-): Promise<number | null> => {
-  const url = new URL(config.yahooQuoteProxyUrl, 'http://local.proxy');
-  url.searchParams.set('symbols', symbol.toUpperCase());
-
-  const response = await fetchImpl(`${url.pathname}${url.search}`);
-  if (!response.ok) return null;
-
-  const payload = await response.json();
-  const quote = payload?.quoteResponse?.result?.[0];
-  const price = quote?.regularMarketPrice;
-  return Number.isFinite(price) && price > 0 ? Number(price) : null;
-};
 
 export const fetchYahooNewsSignals = async (
   symbol: string,
   fetchImpl: typeof fetch,
-  config = defaultLiveProviderConfig
+  yahooSearchProxyUrlOverride: string = yahooSearchProxyUrl
 ): Promise<NewsSignal[]> => {
-  const url = new URL(config.yahooSearchProxyUrl, 'http://local.proxy');
+  const url = new URL(yahooSearchProxyUrlOverride, 'http://local.proxy');
   url.searchParams.set('q', symbol.toUpperCase());
   url.searchParams.set('newsCount', '8');
 
@@ -61,14 +38,6 @@ export const fetchYahooNewsSignals = async (
     })
     .filter((row: NewsSignal | null): row is NewsSignal => row !== null)
     .slice(0, 6);
-};
-
-export const yahooTickerPriceProvider: TickerPriceProvider = {
-  id: 'yahoo-price',
-  name: 'Yahoo Finance Quote Provider',
-  async fetchPrice(symbol, fetchImpl) {
-    return fetchYahooPrice(symbol, fetchImpl);
-  }
 };
 
 export const yahooNewsProvider: NewsProvider = {

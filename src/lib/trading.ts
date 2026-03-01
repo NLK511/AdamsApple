@@ -76,6 +76,7 @@ const buildTicker = async (
     providerWarnings.push(`Price provider error: ${error instanceof Error ? error.message : 'unknown error'}`);
   }
   if (!Number.isFinite(providerPrice)) {
+    console.error(`Price unavailable for ${normalized} from provider ${context.tickerPriceProvider.id}.`);
     providerWarnings.push(`Price unavailable from ${context.tickerPriceProvider.id}.`);
   }
   const currentPrice = Number.isFinite(providerPrice)
@@ -236,8 +237,6 @@ export const tickWatchlistsWithNotifications = (
   const nextWatchlists = watchlists.map((watchlist) => ({
     ...watchlist,
     tickers: watchlist.tickers.map((ticker) => {
-      const priceDelta = (Math.random() - 0.5) * Math.max(0.35, ticker.currentPrice * 0.0125);
-      const currentPrice = Number(Math.max(0.2, ticker.currentPrice + priceDelta).toFixed(2));
 
       const changes = buckets.reduce<Record<ChangeBucket, number>>(
         (acc, bucket) => {
@@ -263,16 +262,16 @@ export const tickWatchlistsWithNotifications = (
       const alerts = ticker.alerts.map((alert) => {
         if (!alert.enabled) return alert;
         const hit =
-          alert.direction === 'above' ? currentPrice >= alert.threshold : currentPrice <= alert.threshold;
+          alert.direction === 'above' ? ticker.currentPrice >= alert.threshold : ticker.currentPrice <= alert.threshold;
 
         if (hit && !alert.triggered) {
-          notifications.push(buildNotification(watchlist, ticker, alert, currentPrice, timestampMs));
+          notifications.push(buildNotification(watchlist, ticker, alert, ticker.currentPrice, timestampMs));
         }
 
         return { ...alert, triggered: hit };
       });
 
-      return { ...ticker, currentPrice, changes, alerts, providerWarnings: ticker.providerWarnings ?? [] };
+      return { ...ticker, currentPrice: ticker.currentPrice, changes, alerts, providerWarnings: ticker.providerWarnings ?? [] };
     })
   }));
 
