@@ -1,6 +1,7 @@
 /**
  * Live provider adapters using SvelteKit proxy endpoints for external APIs.
  */
+import type { PriceProviderResponse } from '../../../model/providers/price-provider-response';
 import type { NewsProvider, NewsSignal, TickerPriceProvider } from '../contracts';
 
 
@@ -10,7 +11,7 @@ export const fetchPrice = async (
   symbol: string,
   fetchImpl: typeof fetch,
   quoteProxyUrlOverride = quoteProxyUrl
-): Promise<number | null> => {
+): Promise<PriceProviderResponse | null> => {
   const url = new URL(quoteProxyUrlOverride, 'http://local.proxy');
   url.searchParams.set('symbols', symbol.toUpperCase());
 
@@ -23,8 +24,7 @@ export const fetchPrice = async (
   };
 
   const payload = await response.json();
-  const price = payload?.Price;
-  return Number.isFinite(price) && price > 0 ? Number(price) : null;
+  return payload;
 };
 
 

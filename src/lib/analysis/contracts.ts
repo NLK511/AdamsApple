@@ -1,3 +1,5 @@
+import type { PriceProviderResponse } from "../../model/providers/price-provider-response";
+
 /**
  * Shared analysis contracts and model interfaces.
  * Defines report shapes, pluggable providers, engines, and context composition.
@@ -65,7 +67,13 @@ export interface NewsProvider {
 export interface TickerPriceProvider {
   id: string;
   name: string;
-  fetchPrice(symbol: string, fetchImpl: typeof fetch): Promise<number | null>;
+  fetchPrice(symbol: string, fetchImpl: typeof fetch): Promise<PriceProviderResponse | null>;
+}
+
+export interface TickerPriceChangeProvider {
+  id: string;
+  name: string;
+  fetchChange(symbol: string, fetchImpl: typeof fetch): Promise<number | null>;
 }
 
 export interface SentimentEngine {

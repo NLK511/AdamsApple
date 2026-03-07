@@ -3,9 +3,9 @@
   Manages watchlists, alerts, notifications, and ticker navigation to detail tabs.
 -->
 <script lang="ts">
-  import { browser } from '$app/environment';
-  import { onMount } from 'svelte';
-  import { analysisContexts } from '$lib/analysis/contexts';
+  import { browser } from "$app/environment";
+  import { onMount } from "svelte";
+  import { analysisContexts } from "$lib/analysis/contexts";
   import {
     addAlert,
     addTicker,
@@ -19,32 +19,35 @@
     unreadNotificationCount,
     type PriceNotification,
     type Ticker,
-    type Watchlist
-  } from '$lib/trading';
+    type Watchlist,
+  } from "$lib/trading";
 
-  const STORAGE_KEY = 'trade-desk-watchlists-v1';
-  const NOTIFICATION_STORAGE_KEY = 'trade-desk-notifications-v1';
-  const ACTIVE_CONTEXT_KEY = 'trade-desk-active-context-v1';
+  const STORAGE_KEY = "trade-desk-watchlists-v1";
+  const NOTIFICATION_STORAGE_KEY = "trade-desk-notifications-v1";
+  const ACTIVE_CONTEXT_KEY = "trade-desk-active-context-v1";
 
   let activeContextId = analysisContexts[0].id;
   let watchlists: Watchlist[] = [];
   let notifications: PriceNotification[] = [];
   let showInbox = false;
-  let selectedWatchlistId = watchlists[0]?.id ?? '';
-  let newWatchlistName = '';
-  let tickerSymbol = '';
-  let alertDrafts: Record<string, { direction: 'above' | 'below'; threshold: string }> = {};
+  let selectedWatchlistId = watchlists[0]?.id ?? "";
+  let newWatchlistName = "";
+  let tickerSymbol = "";
+  let alertDrafts: Record<
+    string,
+    { direction: "above" | "below"; threshold: string }
+  > = {};
 
-  const currency = new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 2
+  const currency = new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 2,
   });
 
-  const signed = new Intl.NumberFormat('en-US', {
+  const signed = new Intl.NumberFormat("en-US", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-    signDisplay: 'always'
+    signDisplay: "always",
   });
 
   onMount(() => {
@@ -54,7 +57,10 @@
 
     const init = async () => {
       const storedContextId = localStorage.getItem(ACTIVE_CONTEXT_KEY);
-      if (storedContextId && analysisContexts.some((ctx) => ctx.id === storedContextId)) {
+      if (
+        storedContextId &&
+        analysisContexts.some((ctx) => ctx.id === storedContextId)
+      ) {
         activeContextId = storedContextId;
       }
 
@@ -73,14 +79,16 @@
 
       if (watchlists.length === 0) {
         watchlists = await defaultWatchlists(activeContextId);
-        selectedWatchlistId = watchlists[0]?.id ?? '';
+        selectedWatchlistId = watchlists[0]?.id ?? "";
         persist();
       }
 
       const rawNotifications = localStorage.getItem(NOTIFICATION_STORAGE_KEY);
       if (rawNotifications) {
         try {
-          const parsedNotifications = JSON.parse(rawNotifications) as PriceNotification[];
+          const parsedNotifications = JSON.parse(
+            rawNotifications,
+          ) as PriceNotification[];
           if (Array.isArray(parsedNotifications)) {
             notifications = parsedNotifications;
           }
@@ -90,7 +98,10 @@
       }
 
       if (watchlists.length > 0) {
-        watchlists = await hydrateWatchlistsForContext(watchlists, activeContextId);
+        watchlists = await hydrateWatchlistsForContext(
+          watchlists,
+          activeContextId,
+        );
         persist();
       }
 
@@ -112,7 +123,9 @@
   });
 
   $: selectedWatchlist =
-    watchlists.find((watchlist) => watchlist.id === selectedWatchlistId) ?? watchlists[0] ?? null;
+    watchlists.find((watchlist) => watchlist.id === selectedWatchlistId) ??
+    watchlists[0] ??
+    null;
   $: triggeredCount = watchlists
     .flatMap((watchlist) => watchlist.tickers)
     .flatMap((t) => t.alerts)
@@ -122,7 +135,10 @@
   const persist = () => {
     if (!browser) return;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(watchlists));
-    localStorage.setItem(NOTIFICATION_STORAGE_KEY, JSON.stringify(notifications));
+    localStorage.setItem(
+      NOTIFICATION_STORAGE_KEY,
+      JSON.stringify(notifications),
+    );
     localStorage.setItem(ACTIVE_CONTEXT_KEY, activeContextId);
   };
 
@@ -134,7 +150,7 @@
     }
   };
 
-  let expandedWarningsTickerId = '';
+  let expandedWarningsTickerId = "";
 
   const openNotification = (notificationId: string) => {
     notifications = markNotificationRead(notifications, notificationId);
@@ -146,11 +162,11 @@
     const item: Watchlist = {
       id: crypto.randomUUID(),
       name: newWatchlistName.trim(),
-      tickers: []
+      tickers: [],
     };
     watchlists = [...watchlists, item];
     selectedWatchlistId = item.id;
-    newWatchlistName = '';
+    newWatchlistName = "";
     persist();
   };
 
@@ -160,70 +176,79 @@
       watchlists.map(async (watchlist) =>
         watchlist.id === selectedWatchlist.id
           ? addTicker(watchlist, tickerSymbol.trim(), activeContextId)
-          : watchlist
-      )
+          : watchlist,
+      ),
     );
-    tickerSymbol = '';
+    tickerSymbol = "";
     persist();
   };
 
   const setActiveContext = async (event: Event) => {
     const target = event.currentTarget as HTMLSelectElement | null;
     const next = target?.value ?? analysisContexts[0].id;
-    activeContextId = analysisContexts.some((ctx) => ctx.id === next) ? next : analysisContexts[0].id;
+    activeContextId = analysisContexts.some((ctx) => ctx.id === next)
+      ? next
+      : analysisContexts[0].id;
     if (browser) localStorage.setItem(ACTIVE_CONTEXT_KEY, activeContextId);
 
     if (watchlists.length === 0) {
       watchlists = await defaultWatchlists(activeContextId);
-      selectedWatchlistId = watchlists[0]?.id ?? '';
+      selectedWatchlistId = watchlists[0]?.id ?? "";
     } else {
-      watchlists = await hydrateWatchlistsForContext(watchlists, activeContextId);
+      watchlists = await hydrateWatchlistsForContext(
+        watchlists,
+        activeContextId,
+      );
     }
-    expandedWarningsTickerId = '';
+    expandedWarningsTickerId = "";
     persist();
   };
 
   const getAlertDraft = (tickerId: string) =>
     alertDrafts[tickerId] ?? {
-      direction: 'above' as const,
-      threshold: ''
+      direction: "above" as const,
+      threshold: "",
     };
 
-  const setAlertDirection = (tickerId: string, direction: 'above' | 'below') => {
+  const setAlertDirection = (
+    tickerId: string,
+    direction: "above" | "below",
+  ) => {
     alertDrafts = {
       ...alertDrafts,
       [tickerId]: {
         ...getAlertDraft(tickerId),
-        direction
-      }
+        direction,
+      },
     };
   };
 
-  const normalizeDirection = (value: string): 'above' | 'below' =>
-    value === 'below' ? 'below' : 'above';
+  const normalizeDirection = (value: string): "above" | "below" =>
+    value === "below" ? "below" : "above";
 
   const setAlertThreshold = (tickerId: string, threshold: string) => {
     alertDrafts = {
       ...alertDrafts,
       [tickerId]: {
         ...getAlertDraft(tickerId),
-        threshold
-      }
+        threshold,
+      },
     };
   };
 
   const onAlertDirectionChange = (tickerId: string, event: Event) => {
     const target = event.currentTarget as HTMLSelectElement | null;
-    setAlertDirection(tickerId, normalizeDirection(target?.value ?? 'above'));
+    setAlertDirection(tickerId, normalizeDirection(target?.value ?? "above"));
   };
 
   const onAlertThresholdInput = (tickerId: string, event: Event) => {
     const target = event.currentTarget as HTMLInputElement | null;
-    setAlertThreshold(tickerId, target?.value ?? '');
+    setAlertThreshold(tickerId, target?.value ?? "");
   };
 
   const toggleWarnings = (tickerId: string) => {
-    expandedWarningsTickerId = expandedWarningsTickerId === tickerId ? '' : tickerId;
+    expandedWarningsTickerId =
+      expandedWarningsTickerId === tickerId ? "" : tickerId;
   };
 
   const createAlert = (ticker: Ticker) => {
@@ -235,16 +260,16 @@
       return {
         ...watchlist,
         tickers: watchlist.tickers.map((t) =>
-          t.id === ticker.id ? addAlert(t, draft.direction, parsed) : t
-        )
+          t.id === ticker.id ? addAlert(t, draft.direction, parsed) : t,
+        ),
       };
     });
     alertDrafts = {
       ...alertDrafts,
       [ticker.id]: {
         ...draft,
-        threshold: ''
-      }
+        threshold: "",
+      },
     };
     persist();
   };
@@ -256,8 +281,8 @@
       return {
         ...watchlist,
         tickers: watchlist.tickers.map((ticker) =>
-          ticker.id === tickerId ? removeAlert(ticker, alertId) : ticker
-        )
+          ticker.id === tickerId ? removeAlert(ticker, alertId) : ticker,
+        ),
       };
     });
     persist();
@@ -270,8 +295,8 @@
       return {
         ...watchlist,
         tickers: watchlist.tickers.map((ticker) =>
-          ticker.id === tickerId ? toggleAlert(ticker, alertId) : ticker
-        )
+          ticker.id === tickerId ? toggleAlert(ticker, alertId) : ticker,
+        ),
       };
     });
     persist();
@@ -283,9 +308,19 @@
     <div class="hero-top">
       <div>
         <h1>TradeDesk Advisor</h1>
-        <p>Monitor curated watchlists, track price momentum, and react quickly with threshold alerts.</p>
-        <label class="context-label" for="dashboard-context">Active pricing context</label>
-        <select id="dashboard-context" class="context-select" value={activeContextId} on:change={setActiveContext}>
+        <p>
+          Monitor curated watchlists, track price momentum, and react quickly
+          with threshold alerts.
+        </p>
+        <label class="context-label" for="dashboard-context"
+          >Active pricing context</label
+        >
+        <select
+          id="dashboard-context"
+          class="context-select"
+          value={activeContextId}
+          on:change={setActiveContext}
+        >
           {#each analysisContexts as context}
             <option value={context.id}>{context.name}</option>
           {/each}
@@ -304,7 +339,12 @@
         <small>Watchlists</small>
       </article>
       <article>
-        <span>{watchlists.reduce((sum, list) => sum + list.tickers.length, 0)}</span>
+        <span
+          >{watchlists.reduce(
+            (sum, list) => sum + list.tickers.length,
+            0,
+          )}</span
+        >
         <small>Tracked Tickers</small>
       </article>
       <article>
@@ -318,7 +358,10 @@
     <section class="inbox">
       <h2>Notification Inbox</h2>
       {#if notifications.length === 0}
-        <p class="empty">No notifications yet. Alerts will appear here when thresholds are crossed.</p>
+        <p class="empty">
+          No notifications yet. Alerts will appear here when thresholds are
+          crossed.
+        </p>
       {:else}
         <ul>
           {#each notifications as notification}
@@ -326,7 +369,9 @@
               <button on:click={() => openNotification(notification.id)}>
                 <strong>{notification.tickerSymbol}</strong>
                 <span>{notification.message}</span>
-                <small>{new Date(notification.createdAt).toLocaleString()}</small>
+                <small
+                  >{new Date(notification.createdAt).toLocaleString()}</small
+                >
               </button>
             </li>
           {/each}
@@ -348,7 +393,11 @@
     <div class="control-group compact">
       <label for="new-watchlist">New watchlist</label>
       <div class="inline">
-        <input id="new-watchlist" bind:value={newWatchlistName} placeholder="e.g. Dividend Focus" />
+        <input
+          id="new-watchlist"
+          bind:value={newWatchlistName}
+          placeholder="e.g. Dividend Focus"
+        />
         <button on:click={createWatchlist}>Create</button>
       </div>
     </div>
@@ -356,7 +405,12 @@
     <div class="control-group compact">
       <label for="ticker">Add ticker</label>
       <div class="inline">
-        <input id="ticker" bind:value={tickerSymbol} maxlength="6" placeholder="e.g. AMZN" />
+        <input
+          id="ticker"
+          bind:value={tickerSymbol}
+          maxlength="6"
+          placeholder="e.g. AMZN"
+        />
         <button on:click={createTicker}>Add</button>
       </div>
     </div>
@@ -366,7 +420,9 @@
     <section class="table-panel">
       <h2>{selectedWatchlist.name}</h2>
       {#if selectedWatchlist.tickers.length === 0}
-        <p class="empty">No tickers yet. Add symbols to start tracking this watchlist.</p>
+        <p class="empty">
+          No tickers yet. Add symbols to start tracking this watchlist.
+        </p>
       {:else}
         <div class="table-wrap">
           <table>
@@ -374,11 +430,7 @@
               <tr>
                 <th>Ticker</th>
                 <th>Price</th>
-                <th>Daily</th>
-                <th>Weekly</th>
-                <th>Monthly</th>
-                <th>Quarterly</th>
-                <th>Yearly</th>
+                <th>Change</th>
                 <th>Alerts</th>
               </tr>
             </thead>
@@ -386,54 +438,81 @@
               {#each selectedWatchlist.tickers as ticker}
                 <tr>
                   <td class="symbol">
-                    <a href={`/ticker/${ticker.symbol}`} target="_blank" rel="noopener noreferrer">{ticker.symbol}</a>
+                    <a
+                      href={`/ticker/${ticker.symbol}`}
+                      target="_blank"
+                      rel="noopener noreferrer">{ticker.symbol}</a
+                    >
                     {#if (ticker.providerWarnings?.length ?? 0) > 0}
-                      <button class="warning-btn" aria-label="Provider warnings" title="Provider warnings" on:click={() => toggleWarnings(ticker.id)}>⚠️</button>
+                      <button
+                        class="warning-btn"
+                        aria-label="Provider warnings"
+                        title="Provider warnings"
+                        on:click={() => toggleWarnings(ticker.id)}>⚠️</button
+                      >
                     {/if}
                   </td>
                   <td>{currency.format(ticker.currentPrice)}</td>
-                  <td class:up={ticker.changes.daily >= 0} class:down={ticker.changes.daily < 0}>{signed.format(ticker.changes.daily)}%</td>
-                  <td class:up={ticker.changes.weekly >= 0} class:down={ticker.changes.weekly < 0}>{signed.format(ticker.changes.weekly)}%</td>
-                  <td class:up={ticker.changes.monthly >= 0} class:down={ticker.changes.monthly < 0}>{signed.format(ticker.changes.monthly)}%</td>
-                  <td class:up={ticker.changes.quarterly >= 0} class:down={ticker.changes.quarterly < 0}>{signed.format(ticker.changes.quarterly)}%</td>
-                  <td class:up={ticker.changes.yearly >= 0} class:down={ticker.changes.yearly < 0}>{signed.format(ticker.changes.yearly)}%</td>
+                  <td
+                    class:up={ticker.changes >= 0}
+                    class:down={ticker.changes < 0}
+                    >{signed.format(ticker.changes)}%</td
+                  >
                   <td>
                     <div class="alerts">
                       {#if ticker.alerts.length === 0}
                         <small>None</small>
                       {:else}
                         {#each ticker.alerts as alert}
-                          <div class:triggered={alert.triggered} class="alert-chip">
-                            <span>{alert.direction === 'above' ? '↑' : '↓'} {currency.format(alert.threshold)}</span>
-                            <button title="toggle" on:click={() => flipAlert(ticker.id, alert.id)}>
-                              {alert.enabled ? 'On' : 'Off'}
+                          <div
+                            class:triggered={alert.triggered}
+                            class="alert-chip"
+                          >
+                            <span
+                              >{alert.direction === "above" ? "↑" : "↓"}
+                              {currency.format(alert.threshold)}</span
+                            >
+                            <button
+                              title="toggle"
+                              on:click={() => flipAlert(ticker.id, alert.id)}
+                            >
+                              {alert.enabled ? "On" : "Off"}
                             </button>
-                            <button title="remove" on:click={() => deleteAlert(ticker.id, alert.id)}>✕</button>
+                            <button
+                              title="remove"
+                              on:click={() => deleteAlert(ticker.id, alert.id)}
+                              >✕</button
+                            >
                           </div>
                         {/each}
                       {/if}
                       <div class="inline">
                         <select
                           value={getAlertDraft(ticker.id).direction}
-                          on:change={(event) => onAlertDirectionChange(ticker.id, event)}>
+                          on:change={(event) =>
+                            onAlertDirectionChange(ticker.id, event)}
+                        >
                           <option value="above">Above</option>
                           <option value="below">Below</option>
                         </select>
                         <input
                           value={getAlertDraft(ticker.id).threshold}
-                          on:input={(event) => onAlertThresholdInput(ticker.id, event)}
+                          on:input={(event) =>
+                            onAlertThresholdInput(ticker.id, event)}
                           type="number"
                           min="0.01"
                           step="0.01"
-                          placeholder="Price" />
-                        <button on:click={() => createAlert(ticker)}>Set</button>
+                          placeholder="Price"
+                        />
+                        <button on:click={() => createAlert(ticker)}>Set</button
+                        >
                       </div>
 
                       {#if expandedWarningsTickerId === ticker.id && (ticker.providerWarnings?.length ?? 0) > 0}
                         <div class="warning-panel">
                           <strong>Provider warnings</strong>
                           <ul>
-                            {#each (ticker.providerWarnings ?? []) as warning}
+                            {#each ticker.providerWarnings ?? [] as warning}
                               <li>{warning}</li>
                             {/each}
                           </ul>
@@ -454,7 +533,15 @@
 <style>
   :global(body) {
     margin: 0;
-    font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+    font-family:
+      Inter,
+      system-ui,
+      -apple-system,
+      Segoe UI,
+      Roboto,
+      Helvetica,
+      Arial,
+      sans-serif;
     background: linear-gradient(170deg, #f8fafc 0%, #eef2ff 100%);
     color: #0f172a;
   }
@@ -651,7 +738,6 @@
     text-decoration: underline;
   }
 
-
   .warning-btn {
     margin-left: 0.45rem;
     background: #fff7ed;
@@ -675,7 +761,6 @@
     margin: 0.35rem 0 0;
     padding-left: 1rem;
   }
-
 
   .up {
     color: #0f766e;

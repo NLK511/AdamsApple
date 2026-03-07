@@ -2,7 +2,7 @@
  * Live provider adapters using SvelteKit proxy endpoints for external Yahoo APIs.
  * Ensures browser consumers avoid direct cross-origin requests and CORS failures.
  */
-import type { NewsProvider, NewsSignal, TickerPriceProvider } from '../contracts';
+import type { NewsProvider, NewsSignal } from '../contracts';
 
 
 const  yahooSearchProxyUrl = '/api/providers/yahoo/search'

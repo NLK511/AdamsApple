@@ -2,9 +2,13 @@
  * Trading domain module for watchlists, alerts, and simulated market ticks.
  * Centralizes state shapes and pure update helpers used by dashboard UI.
  */
+import type { PriceProviderResponse } from '../model/providers/price-provider-response';
 import { getAnalysisContext } from './analysis/contexts';
 
-export type ChangeBucket = 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+const DEFAULT_WATCHLIST_SYMBOLS = [
+  { name: 'Core Holdings', symbols: ['AAPL', 'MSFT', 'NVDA'] },
+  { name: 'Growth Radar', symbols: ['TSLA', 'SHOP', 'AMD'] }
+] as const;
 
 export interface AlertRule {
   id: string;
@@ -18,7 +22,7 @@ export interface Ticker {
   id: string;
   symbol: string;
   currentPrice: number;
-  changes: Record<ChangeBucket, number>;
+  changes: number;
   alerts: AlertRule[];
   providerWarnings: string[];
 }
@@ -49,18 +53,9 @@ interface TickResult {
   notifications: PriceNotification[];
 }
 
-const buckets: ChangeBucket[] = ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'];
 const uid = () => Math.random().toString(36).slice(2, 10);
 
-const scoreToChanges = (score: number): Record<ChangeBucket, number> => ({
-  daily: Number((score * 0.9).toFixed(2)),
-  weekly: Number((score * 1.7).toFixed(2)),
-  monthly: Number((score * 3.1).toFixed(2)),
-  quarterly: Number((score * 4.6).toFixed(2)),
-  yearly: Number((score * 7.5).toFixed(2))
-});
-
-const buildTicker = async (
+const getCurrentTickerPrice = async (
   symbol: string,
   contextId = 'default_mock',
   fetchImpl: typeof fetch = fetch
@@ -69,55 +64,29 @@ const buildTicker = async (
   const context = getAnalysisContext(contextId);
   const providerWarnings: string[] = [];
 
-  let providerPrice: number | null = null;
+  let providerResponse: PriceProviderResponse | null = null;
   try {
-    providerPrice = await context.tickerPriceProvider.fetchPrice(normalized, fetchImpl);
+    providerResponse = await context.tickerPriceProvider.fetchPrice(normalized, fetchImpl) as PriceProviderResponse;
   } catch (error) {
     providerWarnings.push(`Price provider error: ${error instanceof Error ? error.message : 'unknown error'}`);
   }
-  if (!Number.isFinite(providerPrice)) {
+  if (!Number.isFinite(providerResponse?.Price)) {
     console.error(`Price unavailable for ${normalized} from provider ${context.tickerPriceProvider.id}.`);
     providerWarnings.push(`Price unavailable from ${context.tickerPriceProvider.id}.`);
   }
-  const currentPrice = Number.isFinite(providerPrice)
-    ? Number((providerPrice as number).toFixed(2))
-    : 0;
-
-  let signals = [] as Array<{ source: 'X' | 'Financial Times'; signal: string; confidence: number }>;
-  try {
-    signals = await context.newsProvider.fetchSignals(normalized, fetchImpl);
-  } catch (error) {
-    providerWarnings.push(`News provider error: ${error instanceof Error ? error.message : 'unknown error'}`);
-  }
-  if (signals.length === 0) {
-    providerWarnings.push(`No signals returned from ${context.newsProvider.id}.`);
-  }
-
-  const sentiment = context.sentimentEngine.build(normalized, signals);
-  const changes = signals.length > 0
-    ? scoreToChanges(sentiment.score)
-    : {
-        daily: 0,
-        weekly: 0,
-        monthly: 0,
-        quarterly: 0,
-        yearly: 0
-      };
+  const currentPrice = providerResponse?.Price ?? 0;
+  const currentPriceChange = providerResponse?.ChangePercentage ?? 0 
 
   return {
     id: uid(),
     symbol: normalized,
     currentPrice,
-    changes,
+    changes: currentPriceChange,
     alerts: [],
     providerWarnings
   };
 };
 
-const DEFAULT_WATCHLIST_SYMBOLS = [
-  { name: 'Core Holdings', symbols: ['AAPL', 'MSFT', 'NVDA'] },
-  { name: 'Growth Radar', symbols: ['TSLA', 'SHOP', 'AMD'] }
-] as const;
 
 export const defaultWatchlists = async (
   contextId = 'default_mock',
@@ -127,7 +96,7 @@ export const defaultWatchlists = async (
     DEFAULT_WATCHLIST_SYMBOLS.map(async (item) => ({
       id: uid(),
       name: item.name,
-      tickers: await Promise.all(item.symbols.map((symbol) => buildTicker(symbol, contextId, fetchImpl)))
+      tickers: await Promise.all(item.symbols.map((symbol) => getCurrentTickerPrice(symbol, contextId, fetchImpl)))
     }))
   );
 
@@ -137,7 +106,7 @@ const refreshTickerFromContext = async (
   contextId = 'default_mock',
   fetchImpl: typeof fetch = fetch
 ): Promise<Ticker> => {
-  const refreshed = await buildTicker(ticker.symbol, contextId, fetchImpl);
+  const refreshed = await getCurrentTickerPrice(ticker.symbol, contextId, fetchImpl);
   return {
     ...refreshed,
     id: ticker.id,
@@ -166,7 +135,7 @@ export const addTicker = async (
   fetchImpl: typeof fetch = fetch
 ): Promise<Watchlist> => ({
   ...watchlist,
-  tickers: [...watchlist.tickers, await buildTicker(symbol, contextId, fetchImpl)]
+  tickers: [...watchlist.tickers, await getCurrentTickerPrice(symbol, contextId, fetchImpl)]
 });
 
 export const addAlert = (
@@ -223,11 +192,6 @@ const buildNotification = (
   };
 };
 
-const nextChange = (existing: number, volatility: number) => {
-  const move = (Math.random() - 0.5) * volatility;
-  return Number((existing * 0.92 + move).toFixed(2));
-};
-
 export const tickWatchlistsWithNotifications = (
   watchlists: Watchlist[],
   timestampMs = Date.now()
@@ -237,27 +201,6 @@ export const tickWatchlistsWithNotifications = (
   const nextWatchlists = watchlists.map((watchlist) => ({
     ...watchlist,
     tickers: watchlist.tickers.map((ticker) => {
-
-      const changes = buckets.reduce<Record<ChangeBucket, number>>(
-        (acc, bucket) => {
-          const volatilityMap: Record<ChangeBucket, number> = {
-            daily: 2,
-            weekly: 4,
-            monthly: 6,
-            quarterly: 8,
-            yearly: 12
-          };
-          acc[bucket] = nextChange(ticker.changes[bucket], volatilityMap[bucket]);
-          return acc;
-        },
-        {
-          daily: 0,
-          weekly: 0,
-          monthly: 0,
-          quarterly: 0,
-          yearly: 0
-        }
-      );
 
       const alerts = ticker.alerts.map((alert) => {
         if (!alert.enabled) return alert;
@@ -271,7 +214,7 @@ export const tickWatchlistsWithNotifications = (
         return { ...alert, triggered: hit };
       });
 
-      return { ...ticker, currentPrice: ticker.currentPrice, changes, alerts, providerWarnings: ticker.providerWarnings ?? [] };
+      return { ...ticker, currentPrice: ticker.currentPrice, changes: ticker.changes, alerts, providerWarnings: ticker.providerWarnings ?? [] };
     })
   }));
 
