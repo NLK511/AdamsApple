@@ -50,10 +50,33 @@
     signDisplay: "always",
   });
 
+  const getActiveContext = () =>
+    analysisContexts.find((context) => context.id === activeContextId) ??
+    analysisContexts[0];
+
+  let refreshHandle: ReturnType<typeof setInterval> | undefined;
+  let refreshing = false;
+
+  const setupRefresh = () => {
+    if (!browser) return;
+    if (refreshHandle) clearInterval(refreshHandle);
+    const refreshMs = getActiveContext().refreshIntervalMs;
+    refreshHandle = setInterval(async () => {
+      if (refreshing) return;
+      refreshing = true;
+      watchlists = await hydrateWatchlistsForContext(watchlists, activeContextId);
+      const result = tickWatchlistsWithNotifications(watchlists);
+      watchlists = result.watchlists;
+      if (result.notifications.length > 0) {
+        notifications = [...result.notifications, ...notifications];
+      }
+      persist();
+      refreshing = false;
+    }, refreshMs);
+  };
+
   onMount(() => {
     if (!browser) return;
-
-    let handle: ReturnType<typeof setInterval> | undefined;
 
     const init = async () => {
       const storedContextId = localStorage.getItem(ACTIVE_CONTEXT_KEY);
@@ -105,20 +128,13 @@
         persist();
       }
 
-      handle = setInterval(() => {
-        const result = tickWatchlistsWithNotifications(watchlists);
-        watchlists = result.watchlists;
-        if (result.notifications.length > 0) {
-          notifications = [...result.notifications, ...notifications];
-        }
-        persist();
-      }, 2800);
+      setupRefresh();
     };
 
     void init();
 
     return () => {
-      if (handle) clearInterval(handle);
+      if (refreshHandle) clearInterval(refreshHandle);
     };
   });
 
@@ -202,6 +218,7 @@
     }
     expandedWarningsTickerId = "";
     persist();
+    setupRefresh();
   };
 
   const getAlertDraft = (tickerId: string) =>
@@ -431,6 +448,7 @@
                 <th>Ticker</th>
                 <th>Price</th>
                 <th>Change</th>
+                <th>Sentiment (News/X)</th>
                 <th>Alerts</th>
               </tr>
             </thead>
@@ -458,6 +476,7 @@
                     class:down={ticker.changes < 0}
                     >{signed.format(ticker.changes)}%</td
                   >
+                  <td>{ticker.sentimentNewsScore.toFixed(1)} / {ticker.sentimentXScore.toFixed(1)}</td>
                   <td>
                     <div class="alerts">
                       {#if ticker.alerts.length === 0}

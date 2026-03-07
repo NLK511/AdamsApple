@@ -11,23 +11,31 @@ import {
 import { tickerPriceProvider } from './providers/default-providers';
 import { yahooNewsProvider } from './providers/yahoo-providers';
 import { mockNewsProvider, mockTickerPriceProvider } from './providers/mock-providers';
+import { newsSentimentEngine } from './sentiment/news-sentiment-engine';
+import { xSentimentEngine } from './sentiment/x-sentiment-engine';
 
 export const analysisContexts: AnalysisContext[] = [
   {
     id: 'default_mock',
     name: 'Default Mock Context',
+    refreshIntervalMs: 5000,
     newsProvider: mockNewsProvider,
     tickerPriceProvider: mockTickerPriceProvider,
     sentimentEngine: defaultSentimentEngines[0],
+    sentimentNewsEngine: newsSentimentEngine,
+    sentimentXEngine: xSentimentEngine,
     fundamentalModels: defaultFundamentalModels,
     entryPointModels: defaultEntryPointModels
   },
   {
     id: 'default_live',
     name: 'Default Live Context ',
+    refreshIntervalMs: 30000,
     newsProvider: yahooNewsProvider,
     tickerPriceProvider: tickerPriceProvider,
     sentimentEngine: defaultSentimentEngines[0],
+    sentimentNewsEngine: newsSentimentEngine,
+    sentimentXEngine: xSentimentEngine,
     fundamentalModels: defaultFundamentalModels,
     entryPointModels: defaultEntryPointModels
   }

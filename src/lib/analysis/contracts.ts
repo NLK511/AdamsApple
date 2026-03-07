@@ -82,12 +82,21 @@ export interface SentimentEngine {
   build(symbol: string, signals: NewsSignal[]): SentimentDigest;
 }
 
+export interface SentimentScoreEngine {
+  id: string;
+  name: string;
+  score(signals: NewsSignal[]): number;
+}
+
 export interface AnalysisContext {
   id: string;
   name: string;
+  refreshIntervalMs: number;
   newsProvider: NewsProvider;
   tickerPriceProvider: TickerPriceProvider;
   sentimentEngine: SentimentEngine;
+  sentimentNewsEngine: SentimentScoreEngine;
+  sentimentXEngine: SentimentScoreEngine;
   fundamentalModels: FundamentalModel[];
   entryPointModels: EntryPointModel[];
 }
