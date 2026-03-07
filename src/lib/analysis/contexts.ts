@@ -5,8 +5,7 @@
 import type { AnalysisContext } from './contracts';
 import {
   defaultEntryPointModels,
-  defaultFundamentalModels,
-  defaultSentimentEngines
+  defaultFundamentalModels
 } from './engines';
 import { tickerPriceProvider } from './providers/default-providers';
 import { yahooNewsProvider, yahooSocialNetworkProvider } from './providers/yahoo-providers';
@@ -20,7 +19,6 @@ export const analysisContexts: AnalysisContext[] = [
     refreshIntervalMs: 5000,
     newsProvider: mockNewsProvider,
     tickerPriceProvider: mockTickerPriceProvider,
-    sentimentEngine: defaultSentimentEngines[0],
     socialNetworkProvider: mockSocialNetworkProvider,
     sentimentNewsEngine: newsSentimentEngine,
     socialNetworkEngine: socialNetworkSentimentEngine,
@@ -30,10 +28,9 @@ export const analysisContexts: AnalysisContext[] = [
   {
     id: 'default_live',
     name: 'Default Live Context ',
-    refreshIntervalMs: 30000,
+    refreshIntervalMs: 5000,
     newsProvider: yahooNewsProvider,
     tickerPriceProvider: tickerPriceProvider,
-    sentimentEngine: defaultSentimentEngines[0],
     socialNetworkProvider: yahooSocialNetworkProvider,
     sentimentNewsEngine: newsSentimentEngine,
     socialNetworkEngine: socialNetworkSentimentEngine,

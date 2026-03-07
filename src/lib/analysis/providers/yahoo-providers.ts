@@ -14,6 +14,7 @@ const fetchYahooSignals = async (
   fetchImpl: typeof fetch,
   yahooSearchProxyUrlOverride: string = yahooSearchProxyUrl
 ): Promise<NewsSignal[]> => {
+  console.log(`Fetching Yahoo signals for ${symbol} from proxy URL: ${yahooSearchProxyUrlOverride}`);
   const url = new URL(yahooSearchProxyUrlOverride, 'http://local.proxy');
   url.searchParams.set('q', symbol.toUpperCase());
   url.searchParams.set('newsCount', '8');

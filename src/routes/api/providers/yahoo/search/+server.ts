@@ -8,6 +8,7 @@ import type { RequestHandler } from './$types';
 const YAHOO_SEARCH_URL = 'https://query1.finance.yahoo.com/v1/finance/search';
 
 export const GET: RequestHandler = async ({ url, fetch }) => {
+
   const query = url.searchParams.get('q')?.trim();
   if (!query) {
     return json({ error: 'q query param is required' }, { status: 400 });
@@ -20,6 +21,10 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
   upstream.searchParams.set('newsCount', newsCount);
 
   const response = await fetch(upstream.toString());
+  if(!response.ok) {
+    console.error(`Yahoo search fetch failed for ${query}: ${response.status} ${response.statusText}`);
+    return json({ error: `Yahoo search fetch failed: ${response.status} ${response.statusText}` }, { status: 502 });
+    }
   const text = await response.text();
 
   return new Response(text, {
