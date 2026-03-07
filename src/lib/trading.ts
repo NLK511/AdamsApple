@@ -9,6 +9,7 @@ import type { PriceNotification } from './analysis/model/notifications/price-not
 import type { TickResult } from './analysis/model/ticks/tick-result';
 import type { Ticker } from './analysis/model/tickers/ticker';
 import type { Watchlist } from './analysis/model/watchlists/watchlist';
+import type { NewsSignal } from './analysis/contracts';
 import { getAnalysisContext } from './analysis/contexts';
 
 const DEFAULT_WATCHLIST_SYMBOLS = [
@@ -16,23 +17,32 @@ const DEFAULT_WATCHLIST_SYMBOLS = [
   { name: 'Growth Radar', symbols: ['TSLA', 'SHOP', 'AMD'] }
 ] as const;
 
-export type { AlertDirection } from './analysis/model/alerts/alert-direction';
-export type { AlertRule } from './analysis/model/alerts/alert-rule';
-export type { PriceNotification } from './analysis/model/notifications/price-notification';
-export type { TickResult } from './analysis/model/ticks/tick-result';
-export type { Ticker } from './analysis/model/tickers/ticker';
-export type { Watchlist } from './analysis/model/watchlists/watchlist';
-
 const uid = () => Math.random().toString(36).slice(2, 10);
 
 const getCurrentTickerPrice = async (
   symbol: string,
-  contextId = 'default_mock',
+  contextId:string,
   fetchImpl: typeof fetch = fetch
 ): Promise<Ticker> => {
+  console.log(`Getting current ticker price for ${symbol} in context ${contextId}`);
   const normalized = symbol.toUpperCase();
   const context = getAnalysisContext(contextId);
   const providerWarnings: string[] = [];
+
+  let newsSignals: NewsSignal[] = [];
+  let socialSignals: NewsSignal[] = [];
+  try {
+    newsSignals = await context.newsProvider.fetchSignals(normalized, fetchImpl);
+    console.log(`Fetched ${newsSignals.length} news signals for ${normalized} from provider ${context.newsProvider.id}.`);
+  } catch (error) {
+    console.error(`News provider error for ${normalized} from provider ${context.newsProvider.id}:`, error instanceof Error ? error.message : error);
+    providerWarnings.push(`News provider error: ${error instanceof Error ? error.message : 'unknown error'}`);
+  }
+  try {
+    socialSignals = await context.socialNetworkProvider.fetchSignals(normalized, fetchImpl);
+  } catch (error) {
+    providerWarnings.push(`Social provider error: ${error instanceof Error ? error.message : 'unknown error'}`);
+  }
 
   let providerResponse: PriceProviderResponse | null = null;
   try {
@@ -45,7 +55,9 @@ const getCurrentTickerPrice = async (
     providerWarnings.push(`Price unavailable from ${context.tickerPriceProvider.id}.`);
   }
   const currentPrice = providerResponse?.Price ?? 0;
-  const currentPriceChange = providerResponse?.ChangePercentage ?? 0 
+  const currentPriceChange = providerResponse?.ChangePercentage ?? 0;
+  const sentimentNewsScore = context.sentimentNewsEngine.score(newsSignals);
+  const sentimentSocialScore = context.socialNetworkEngine.score(socialSignals);
 
   return {
     id: uid(),
@@ -53,13 +65,15 @@ const getCurrentTickerPrice = async (
     currentPrice,
     changes: currentPriceChange,
     alerts: [],
-    providerWarnings
+    providerWarnings,
+    sentimentNewsScore,
+    sentimentSocialScore
   };
 };
 
 
 export const defaultWatchlists = async (
-  contextId = 'default_mock',
+  contextId: string,
   fetchImpl: typeof fetch = fetch
 ): Promise<Watchlist[]> =>
   Promise.all(
@@ -73,7 +87,7 @@ export const defaultWatchlists = async (
 
 const refreshTickerFromContext = async (
   ticker: Ticker,
-  contextId = 'default_mock',
+  contextId: string,
   fetchImpl: typeof fetch = fetch
 ): Promise<Ticker> => {
   const refreshed = await getCurrentTickerPrice(ticker.symbol, contextId, fetchImpl);
@@ -86,7 +100,7 @@ const refreshTickerFromContext = async (
 
 export const hydrateWatchlistsForContext = async (
   watchlists: Watchlist[],
-  contextId = 'default_mock',
+  contextId: string,
   fetchImpl: typeof fetch = fetch
 ): Promise<Watchlist[]> =>
   Promise.all(
@@ -101,7 +115,7 @@ export const hydrateWatchlistsForContext = async (
 export const addTicker = async (
   watchlist: Watchlist,
   symbol: string,
-  contextId = 'default_mock',
+  contextId: string,
   fetchImpl: typeof fetch = fetch
 ): Promise<Watchlist> => ({
   ...watchlist,

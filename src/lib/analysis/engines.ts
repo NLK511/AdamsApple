@@ -11,6 +11,7 @@ import type {
   SentimentEngine,
   TargetConsensus
 } from './contracts';
+import { scoreSignal } from './sentiment/scoring';
 
 export const buildTargetConsensus = (symbol: string, currentPrice: number): TargetConsensus => {
   const seed = [...symbol].reduce((acc, char) => acc + char.charCodeAt(0), 0);
@@ -24,15 +25,6 @@ export const buildTargetConsensus = (symbol: string, currentPrice: number): Targ
   const consensusTarget = Number((analysts.reduce((acc, item) => acc + item.targetPrice, 0) / analysts.length).toFixed(2));
   const upsidePercent = Number((((consensusTarget - currentPrice) / currentPrice) * 100).toFixed(2));
   return { consensusTarget, upsidePercent, analysts };
-};
-
-const scoreSignal = (text: string) => {
-  const content = text.toLowerCase();
-  const positive = ['beats', 'growth', 'surge', 'upgrade', 'strong', 'buy', 'record', 'momentum'];
-  const negative = ['miss', 'downgrade', 'lawsuit', 'drop', 'weak', 'sell', 'cuts'];
-  const posHits = positive.reduce((acc, token) => acc + Number(content.includes(token)), 0);
-  const negHits = negative.reduce((acc, token) => acc + Number(content.includes(token)), 0);
-  return posHits - negHits;
 };
 
 const toTrend = (score: number): 'bullish' | 'neutral' | 'bearish' => {

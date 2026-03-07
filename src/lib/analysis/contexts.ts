@@ -5,12 +5,12 @@
 import type { AnalysisContext } from './contracts';
 import {
   defaultEntryPointModels,
-  defaultFundamentalModels,
-  defaultSentimentEngines
+  defaultFundamentalModels
 } from './engines';
 import { tickerPriceProvider } from './providers/default-providers';
-import { yahooNewsProvider } from './providers/yahoo-providers';
-import { mockNewsProvider, mockTickerPriceProvider } from './providers/mock-providers';
+import { yahooNewsProvider, yahooSocialNetworkProvider } from './providers/yahoo-providers';
+import { mockNewsProvider, mockSocialNetworkProvider, mockTickerPriceProvider } from './providers/mock-providers';
+import { newsSentimentEngine, socialNetworkSentimentEngine } from './sentiment/source-sentiment-engine';
 
 export const analysisContexts: AnalysisContext[] = [
   {
@@ -19,7 +19,9 @@ export const analysisContexts: AnalysisContext[] = [
     refreshIntervalMs: 5000,
     newsProvider: mockNewsProvider,
     tickerPriceProvider: mockTickerPriceProvider,
-    sentimentEngine: defaultSentimentEngines[0],
+    socialNetworkProvider: mockSocialNetworkProvider,
+    sentimentNewsEngine: newsSentimentEngine,
+    socialNetworkEngine: socialNetworkSentimentEngine,
     fundamentalModels: defaultFundamentalModels,
     entryPointModels: defaultEntryPointModels
   },
@@ -29,11 +31,13 @@ export const analysisContexts: AnalysisContext[] = [
     refreshIntervalMs: 30000,
     newsProvider: yahooNewsProvider,
     tickerPriceProvider: tickerPriceProvider,
-    sentimentEngine: defaultSentimentEngines[0],
+    socialNetworkProvider: yahooSocialNetworkProvider,
+    sentimentNewsEngine: newsSentimentEngine,
+    socialNetworkEngine: socialNetworkSentimentEngine,
     fundamentalModels: defaultFundamentalModels,
     entryPointModels: defaultEntryPointModels
   }
 ];
 
-export const getAnalysisContext = (contextId: string | null | undefined): AnalysisContext =>
+export const getAnalysisContext = (contextId: string | undefined): AnalysisContext =>
   analysisContexts.find((context) => context.id === contextId) ?? analysisContexts[0];

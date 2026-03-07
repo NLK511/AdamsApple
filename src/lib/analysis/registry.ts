@@ -121,15 +121,16 @@ export const buildTickerReportWithContext = async (
   const now = opts?.now ?? Date.now();
   const providerWarnings: string[] = [];
 
-  let providerPrice: number | null = null;
+  let providerResponse = null;
   try {
-    providerPrice = await context.tickerPriceProvider.fetchPrice(normalized, fetchImpl);
+    providerResponse = await context.tickerPriceProvider.fetchPrice(normalized, fetchImpl);
   } catch (error) {
     providerWarnings.push(`Price provider error: ${error instanceof Error ? error.message : 'unknown error'}`);
   }
 
+  const providerPrice = providerResponse?.Price;
   if (Number.isFinite(providerPrice)) {
-    metadataStorage.upsert(normalized, 'current-price', providerPrice, now);
+    metadataStorage.upsert(normalized, 'current-price', providerPrice as number, now);
   } else {
     providerWarnings.push(`Price unavailable from ${context.tickerPriceProvider.id}.`);
   }

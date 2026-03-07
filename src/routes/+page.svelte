@@ -52,7 +52,7 @@
 
   const getActiveContext = () =>
     analysisContexts.find((context) => context.id === activeContextId) ??
-    analysisContexts[0];
+    analysisContexts[1];
 
   let refreshHandle: ReturnType<typeof setInterval> | undefined;
   let refreshing = false;
@@ -448,6 +448,7 @@
                 <th>Ticker</th>
                 <th>Price</th>
                 <th>Change</th>
+                <th>Sentiment (News/Social)</th>
                 <th>Alerts</th>
               </tr>
             </thead>
@@ -475,6 +476,7 @@
                     class:down={ticker.changes < 0}
                     >{signed.format(ticker.changes)}%</td
                   >
+                  <td>{ticker.sentimentNewsScore.toFixed(1)} / {ticker.sentimentSocialScore.toFixed(1)}</td>
                   <td>
                     <div class="alerts">
                       {#if ticker.alerts.length === 0}
