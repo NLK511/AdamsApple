@@ -16,6 +16,7 @@ export const analysisContexts: AnalysisContext[] = [
   {
     id: 'default_mock',
     name: 'Default Mock Context',
+    refreshIntervalMs: 5000,
     newsProvider: mockNewsProvider,
     tickerPriceProvider: mockTickerPriceProvider,
     sentimentEngine: defaultSentimentEngines[0],
@@ -25,6 +26,7 @@ export const analysisContexts: AnalysisContext[] = [
   {
     id: 'default_live',
     name: 'Default Live Context ',
+    refreshIntervalMs: 30000,
     newsProvider: yahooNewsProvider,
     tickerPriceProvider: tickerPriceProvider,
     sentimentEngine: defaultSentimentEngines[0],

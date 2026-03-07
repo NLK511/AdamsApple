@@ -85,6 +85,7 @@ export interface SentimentEngine {
 export interface AnalysisContext {
   id: string;
   name: string;
+  refreshIntervalMs: number;
   newsProvider: NewsProvider;
   tickerPriceProvider: TickerPriceProvider;
   sentimentEngine: SentimentEngine;
