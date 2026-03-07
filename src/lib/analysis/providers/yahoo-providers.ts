@@ -2,16 +2,14 @@
  * Live provider adapters using SvelteKit proxy endpoints for external Yahoo APIs.
  * Ensures browser consumers avoid direct cross-origin requests and CORS failures.
  */
-import type { NewsProvider, NewsSignal } from '../contracts';
+import type { NewsProvider, NewsSignal, SocialNetworkProvider } from '../contracts';
 
-
-const  yahooSearchProxyUrl = '/api/providers/yahoo/search'
+const yahooSearchProxyUrl = '/api/providers/yahoo/search';
 
 const parseSource = (publisher: string): NewsSignal['source'] =>
   /financial\s*times/i.test(publisher) ? 'Financial Times' : 'X';
 
-
-export const fetchYahooNewsSignals = async (
+const fetchYahooSignals = async (
   symbol: string,
   fetchImpl: typeof fetch,
   yahooSearchProxyUrlOverride: string = yahooSearchProxyUrl
@@ -41,9 +39,19 @@ export const fetchYahooNewsSignals = async (
 };
 
 export const yahooNewsProvider: NewsProvider = {
-  id: 'yahoo-news',
-  name: 'Yahoo Finance News Provider',
+  id: 'yahoo-news-ft',
+  name: 'Yahoo Financial News Provider',
   async fetchSignals(symbol, fetchImpl) {
-    return fetchYahooNewsSignals(symbol, fetchImpl);
+    const signals = await fetchYahooSignals(symbol, fetchImpl);
+    return signals.filter((signal) => signal.source !== 'X');
+  }
+};
+
+export const yahooSocialNetworkProvider: SocialNetworkProvider = {
+  id: 'yahoo-news-x',
+  name: 'Yahoo X Signals Provider',
+  async fetchSignals(symbol, fetchImpl) {
+    const signals = await fetchYahooSignals(symbol, fetchImpl);
+    return signals.filter((signal) => signal.source === 'X');
   }
 };

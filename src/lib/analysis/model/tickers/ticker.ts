@@ -8,5 +8,5 @@ export interface Ticker {
   alerts: AlertRule[];
   providerWarnings: string[];
   sentimentNewsScore: number;
-  sentimentXScore: number;
+  sentimentSocialScore: number;
 }

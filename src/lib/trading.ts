@@ -36,10 +36,16 @@ const getCurrentTickerPrice = async (
   const providerWarnings: string[] = [];
 
   let newsSignals: NewsSignal[] = [];
+  let socialSignals: NewsSignal[] = [];
   try {
     newsSignals = await context.newsProvider.fetchSignals(normalized, fetchImpl);
   } catch (error) {
     providerWarnings.push(`News provider error: ${error instanceof Error ? error.message : 'unknown error'}`);
+  }
+  try {
+    socialSignals = await context.socialNetworkProvider.fetchSignals(normalized, fetchImpl);
+  } catch (error) {
+    providerWarnings.push(`Social provider error: ${error instanceof Error ? error.message : 'unknown error'}`);
   }
 
   let providerResponse: PriceProviderResponse | null = null;
@@ -55,7 +61,7 @@ const getCurrentTickerPrice = async (
   const currentPrice = providerResponse?.Price ?? 0;
   const currentPriceChange = providerResponse?.ChangePercentage ?? 0;
   const sentimentNewsScore = context.sentimentNewsEngine.score(newsSignals);
-  const sentimentXScore = context.sentimentXEngine.score(newsSignals);
+  const sentimentSocialScore = context.socialNetworkEngine.score(socialSignals);
 
   return {
     id: uid(),
@@ -65,7 +71,7 @@ const getCurrentTickerPrice = async (
     alerts: [],
     providerWarnings,
     sentimentNewsScore,
-    sentimentXScore
+    sentimentSocialScore
   };
 };
 
