@@ -3,8 +3,7 @@
  * Centralizes synthetic spot prices and headline signals for offline development.
  */
 import type { PriceProviderResponse } from '../../../model/providers/price-provider-response';
-import { scoreSignal } from '../sentiment/scoring';
-import type { NewsProvider, NewsSignal, SocialNetworkProvider, TickerPriceProvider } from '../contracts';
+import type { NewsProvider, NewsSignal, TickerPriceProvider } from '../contracts';
 
 const symbolSeed = (symbol: string) => [...symbol.toUpperCase()].reduce((acc, char) => acc + char.charCodeAt(0), 0);
 
@@ -43,6 +42,7 @@ export const mockTickerPriceProvider: TickerPriceProvider = {
   id: 'mock-random-price',
   name: 'Mock Random Price Provider',
   async fetchPrice(symbol: string) {
+    return anchorPrice(symbol);
     return anchorPrice(symbol);
   }
 };

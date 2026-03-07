@@ -100,7 +100,6 @@ export interface AnalysisContext {
   refreshIntervalMs: number;
   newsProvider: NewsProvider;
   tickerPriceProvider: TickerPriceProvider;
-  sentimentEngine: SentimentEngine;
   socialNetworkProvider: SocialNetworkProvider;
   sentimentNewsEngine: SentimentScoreEngine;
   socialNetworkEngine: SentimentScoreEngine;

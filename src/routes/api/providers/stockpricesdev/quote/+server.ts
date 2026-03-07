@@ -13,7 +13,7 @@ export type RequestHandler = Kit.RequestHandler<RouteParams, RouteId>;
 const SPDEV_QUOTE_URL = 'https://stockprices.dev/api/stocks';
 
 export const GET: RequestHandler = async ({ url, fetch }) => {
-  console.log('Received quote request with params:', Object.fromEntries(url.searchParams.entries()));
+  //console.log('Received quote request with params:', Object.fromEntries(url.searchParams.entries()));
   const symbols = url.searchParams.get('symbols')?.trim();
   if (!symbols) {
     return json({ error: 'symbols query param is required' }, { status: 400 });
@@ -26,10 +26,10 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
     console.error(`Upstream quote fetch failed for ${symbols}: ${response.status} ${response.statusText}`);
     return json({ error: 'Failed to fetch quote from upstream' }, { status: 502 });
   } else {
-    console.log(`Upstream quote fetch succeeded for ${symbols}: ${response.status} ${response.statusText}`);
+    //console.log(`Upstream quote fetch succeeded for ${symbols}: ${response.status} ${response.statusText}`);
   }
   const text = await response.text();
-  console.log('Upstream response text:', text);
+  //console.log('Upstream response text:', text);
 
   return new Response(text, {
     status: response.status,

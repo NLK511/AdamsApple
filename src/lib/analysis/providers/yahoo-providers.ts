@@ -44,6 +44,7 @@ const fetchYahooSignals = async (
   fetchImpl: typeof fetch,
   yahooSearchProxyUrlOverride: string = yahooSearchProxyUrl
 ): Promise<NewsSignal[]> => {
+  console.log(`Fetching Yahoo signals for ${symbol} from proxy URL: ${yahooSearchProxyUrlOverride}`);
   const url = new URL(yahooSearchProxyUrlOverride, 'http://local.proxy');
   url.searchParams.set('q', symbol.toUpperCase());
   url.searchParams.set('newsCount', '8');
@@ -78,6 +79,17 @@ const fetchYahooSignals = async (
 };
 
 export const yahooNewsProvider: NewsProvider = {
+  id: 'yahoo-news-ft',
+  name: 'Yahoo Financial News Provider',
+  async fetchSignals(symbol, fetchImpl) {
+    const signals = await fetchYahooSignals(symbol, fetchImpl);
+    return signals.filter((signal) => signal.source !== 'X');
+  }
+};
+
+export const yahooSocialNetworkProvider: SocialNetworkProvider = {
+  id: 'yahoo-news-x',
+  name: 'Yahoo X Signals Provider',
   id: 'yahoo-news-ft',
   name: 'Yahoo Financial News Provider',
   async fetchSignals(symbol, fetchImpl) {
