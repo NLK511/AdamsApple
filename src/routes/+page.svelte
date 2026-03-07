@@ -52,7 +52,7 @@
 
   const getActiveContext = () =>
     analysisContexts.find((context) => context.id === activeContextId) ??
-    analysisContexts[0];
+    analysisContexts[1];
 
   let refreshHandle: ReturnType<typeof setInterval> | undefined;
   let refreshing = false;

@@ -50,6 +50,7 @@ const fetchYahooSignals = async (
   url.searchParams.set('newsCount', '8');
 
   const response = await fetchImpl(`${url.pathname}${url.search}`);
+  console.log(`Yahoo search response for ${symbol}: ${response.status} ${response.statusText}`);
   if (!response.ok) return [];
 
   const payload = await response.json();
@@ -67,7 +68,9 @@ const fetchYahooSignals = async (
       }
 
       try {
+        console.log(`Fetching article for signal analysis: ${link}`);
         const analyzed = await readArticleSignal(link, title, fetchImpl);
+        console.log(`Analyzed signal for ${link}: ${analyzed.signal} (confidence: ${analyzed.confidence})`);
         return { source, signal: analyzed.signal, confidence: analyzed.confidence } satisfies NewsSignal;
       } catch {
         return { source, signal: title, confidence: 0.6 } satisfies NewsSignal;
@@ -79,17 +82,6 @@ const fetchYahooSignals = async (
 };
 
 export const yahooNewsProvider: NewsProvider = {
-  id: 'yahoo-news-ft',
-  name: 'Yahoo Financial News Provider',
-  async fetchSignals(symbol, fetchImpl) {
-    const signals = await fetchYahooSignals(symbol, fetchImpl);
-    return signals.filter((signal) => signal.source !== 'X');
-  }
-};
-
-export const yahooSocialNetworkProvider: SocialNetworkProvider = {
-  id: 'yahoo-news-x',
-  name: 'Yahoo X Signals Provider',
   id: 'yahoo-news-ft',
   name: 'Yahoo Financial News Provider',
   async fetchSignals(symbol, fetchImpl) {

@@ -11,7 +11,7 @@ export const fetchPrice = async (
   symbol: string,
   fetchImpl: typeof fetch,
   quoteProxyUrlOverride = quoteProxyUrl
-): Promise<PriceProviderResponse | null> => {
+): Promise<PriceProviderResponse> => {
   const url = new URL(quoteProxyUrlOverride, 'http://local.proxy');
   url.searchParams.set('symbols', symbol.toUpperCase());
 
@@ -19,8 +19,7 @@ export const fetchPrice = async (
   
   const response = await fetchImpl(`${url.pathname}${url.search}`);
   if (!response.ok) {
-    console.error(`Price fetch failed for ${symbol}: ${response.status} ${response.statusText}`);
-    return null;
+    throw new Error(`Price fetch failed: ${response.status} ${response.statusText}`);
   };
 
   const payload = await response.json();

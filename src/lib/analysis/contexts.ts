@@ -28,7 +28,7 @@ export const analysisContexts: AnalysisContext[] = [
   {
     id: 'default_live',
     name: 'Default Live Context ',
-    refreshIntervalMs: 5000,
+    refreshIntervalMs: 30000,
     newsProvider: yahooNewsProvider,
     tickerPriceProvider: tickerPriceProvider,
     socialNetworkProvider: yahooSocialNetworkProvider,
@@ -39,5 +39,5 @@ export const analysisContexts: AnalysisContext[] = [
   }
 ];
 
-export const getAnalysisContext = (contextId: string | null | undefined): AnalysisContext =>
+export const getAnalysisContext = (contextId: string | undefined): AnalysisContext =>
   analysisContexts.find((context) => context.id === contextId) ?? analysisContexts[0];

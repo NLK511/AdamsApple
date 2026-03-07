@@ -17,20 +17,14 @@ const DEFAULT_WATCHLIST_SYMBOLS = [
   { name: 'Growth Radar', symbols: ['TSLA', 'SHOP', 'AMD'] }
 ] as const;
 
-export type { AlertDirection } from './analysis/model/alerts/alert-direction';
-export type { AlertRule } from './analysis/model/alerts/alert-rule';
-export type { PriceNotification } from './analysis/model/notifications/price-notification';
-export type { TickResult } from './analysis/model/ticks/tick-result';
-export type { Ticker } from './analysis/model/tickers/ticker';
-export type { Watchlist } from './analysis/model/watchlists/watchlist';
-
 const uid = () => Math.random().toString(36).slice(2, 10);
 
 const getCurrentTickerPrice = async (
   symbol: string,
-  contextId = 'default_mock',
+  contextId:string,
   fetchImpl: typeof fetch = fetch
 ): Promise<Ticker> => {
+  console.log(`Getting current ticker price for ${symbol} in context ${contextId}`);
   const normalized = symbol.toUpperCase();
   const context = getAnalysisContext(contextId);
   const providerWarnings: string[] = [];
@@ -39,7 +33,9 @@ const getCurrentTickerPrice = async (
   let socialSignals: NewsSignal[] = [];
   try {
     newsSignals = await context.newsProvider.fetchSignals(normalized, fetchImpl);
+    console.log(`Fetched ${newsSignals.length} news signals for ${normalized} from provider ${context.newsProvider.id}.`);
   } catch (error) {
+    console.error(`News provider error for ${normalized} from provider ${context.newsProvider.id}:`, error instanceof Error ? error.message : error);
     providerWarnings.push(`News provider error: ${error instanceof Error ? error.message : 'unknown error'}`);
   }
   try {
@@ -77,7 +73,7 @@ const getCurrentTickerPrice = async (
 
 
 export const defaultWatchlists = async (
-  contextId = 'default_mock',
+  contextId: string,
   fetchImpl: typeof fetch = fetch
 ): Promise<Watchlist[]> =>
   Promise.all(
@@ -91,7 +87,7 @@ export const defaultWatchlists = async (
 
 const refreshTickerFromContext = async (
   ticker: Ticker,
-  contextId = 'default_mock',
+  contextId: string,
   fetchImpl: typeof fetch = fetch
 ): Promise<Ticker> => {
   const refreshed = await getCurrentTickerPrice(ticker.symbol, contextId, fetchImpl);
@@ -104,7 +100,7 @@ const refreshTickerFromContext = async (
 
 export const hydrateWatchlistsForContext = async (
   watchlists: Watchlist[],
-  contextId = 'default_mock',
+  contextId: string,
   fetchImpl: typeof fetch = fetch
 ): Promise<Watchlist[]> =>
   Promise.all(
@@ -119,7 +115,7 @@ export const hydrateWatchlistsForContext = async (
 export const addTicker = async (
   watchlist: Watchlist,
   symbol: string,
-  contextId = 'default_mock',
+  contextId: string,
   fetchImpl: typeof fetch = fetch
 ): Promise<Watchlist> => ({
   ...watchlist,

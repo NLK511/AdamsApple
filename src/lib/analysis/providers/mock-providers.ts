@@ -3,7 +3,8 @@
  * Centralizes synthetic spot prices and headline signals for offline development.
  */
 import type { PriceProviderResponse } from '../../../model/providers/price-provider-response';
-import type { NewsProvider, NewsSignal, TickerPriceProvider } from '../contracts';
+import type { NewsProvider, NewsSignal, SocialNetworkProvider, TickerPriceProvider } from '../contracts';
+import { scoreSignal } from '../sentiment/scoring';
 
 const symbolSeed = (symbol: string) => [...symbol.toUpperCase()].reduce((acc, char) => acc + char.charCodeAt(0), 0);
 
