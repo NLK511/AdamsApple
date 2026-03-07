@@ -3,6 +3,12 @@
  * Centralizes state shapes and pure update helpers used by dashboard UI.
  */
 import type { PriceProviderResponse } from '../model/providers/price-provider-response';
+import type { AlertDirection } from './analysis/model/alerts/alert-direction';
+import type { AlertRule } from './analysis/model/alerts/alert-rule';
+import type { PriceNotification } from './analysis/model/notifications/price-notification';
+import type { TickResult } from './analysis/model/ticks/tick-result';
+import type { Ticker } from './analysis/model/tickers/ticker';
+import type { Watchlist } from './analysis/model/watchlists/watchlist';
 import { getAnalysisContext } from './analysis/contexts';
 
 const DEFAULT_WATCHLIST_SYMBOLS = [
@@ -10,48 +16,12 @@ const DEFAULT_WATCHLIST_SYMBOLS = [
   { name: 'Growth Radar', symbols: ['TSLA', 'SHOP', 'AMD'] }
 ] as const;
 
-export interface AlertRule {
-  id: string;
-  direction: 'above' | 'below';
-  threshold: number;
-  enabled: boolean;
-  triggered: boolean;
-}
-
-export interface Ticker {
-  id: string;
-  symbol: string;
-  currentPrice: number;
-  changes: number;
-  alerts: AlertRule[];
-  providerWarnings: string[];
-}
-
-export interface Watchlist {
-  id: string;
-  name: string;
-  tickers: Ticker[];
-}
-
-export interface PriceNotification {
-  id: string;
-  watchlistId: string;
-  watchlistName: string;
-  tickerId: string;
-  tickerSymbol: string;
-  alertId: string;
-  direction: 'above' | 'below';
-  threshold: number;
-  currentPrice: number;
-  message: string;
-  createdAt: string;
-  read: boolean;
-}
-
-interface TickResult {
-  watchlists: Watchlist[];
-  notifications: PriceNotification[];
-}
+export type { AlertDirection } from './analysis/model/alerts/alert-direction';
+export type { AlertRule } from './analysis/model/alerts/alert-rule';
+export type { PriceNotification } from './analysis/model/notifications/price-notification';
+export type { TickResult } from './analysis/model/ticks/tick-result';
+export type { Ticker } from './analysis/model/tickers/ticker';
+export type { Watchlist } from './analysis/model/watchlists/watchlist';
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 
@@ -140,7 +110,7 @@ export const addTicker = async (
 
 export const addAlert = (
   ticker: Ticker,
-  direction: 'above' | 'below',
+  direction: AlertDirection,
   threshold: number
 ): Ticker => ({
   ...ticker,
