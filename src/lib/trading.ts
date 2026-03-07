@@ -3,6 +3,13 @@
  * Centralizes state shapes and pure update helpers used by dashboard UI.
  */
 import type { PriceProviderResponse } from '../model/providers/price-provider-response';
+import type { AlertDirection } from './analysis/model/alerts/alert-direction';
+import type { AlertRule } from './analysis/model/alerts/alert-rule';
+import type { PriceNotification } from './analysis/model/notifications/price-notification';
+import type { TickResult } from './analysis/model/ticks/tick-result';
+import type { Ticker } from './analysis/model/tickers/ticker';
+import type { Watchlist } from './analysis/model/watchlists/watchlist';
+import type { NewsSignal } from './analysis/contracts';
 import { getAnalysisContext } from './analysis/contexts';
 
 const DEFAULT_WATCHLIST_SYMBOLS = [
@@ -10,48 +17,12 @@ const DEFAULT_WATCHLIST_SYMBOLS = [
   { name: 'Growth Radar', symbols: ['TSLA', 'SHOP', 'AMD'] }
 ] as const;
 
-export interface AlertRule {
-  id: string;
-  direction: 'above' | 'below';
-  threshold: number;
-  enabled: boolean;
-  triggered: boolean;
-}
-
-export interface Ticker {
-  id: string;
-  symbol: string;
-  currentPrice: number;
-  changes: number;
-  alerts: AlertRule[];
-  providerWarnings: string[];
-}
-
-export interface Watchlist {
-  id: string;
-  name: string;
-  tickers: Ticker[];
-}
-
-export interface PriceNotification {
-  id: string;
-  watchlistId: string;
-  watchlistName: string;
-  tickerId: string;
-  tickerSymbol: string;
-  alertId: string;
-  direction: 'above' | 'below';
-  threshold: number;
-  currentPrice: number;
-  message: string;
-  createdAt: string;
-  read: boolean;
-}
-
-interface TickResult {
-  watchlists: Watchlist[];
-  notifications: PriceNotification[];
-}
+export type { AlertDirection } from './analysis/model/alerts/alert-direction';
+export type { AlertRule } from './analysis/model/alerts/alert-rule';
+export type { PriceNotification } from './analysis/model/notifications/price-notification';
+export type { TickResult } from './analysis/model/ticks/tick-result';
+export type { Ticker } from './analysis/model/tickers/ticker';
+export type { Watchlist } from './analysis/model/watchlists/watchlist';
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 
@@ -64,6 +35,19 @@ const getCurrentTickerPrice = async (
   const context = getAnalysisContext(contextId);
   const providerWarnings: string[] = [];
 
+  let newsSignals: NewsSignal[] = [];
+  let socialSignals: NewsSignal[] = [];
+  try {
+    newsSignals = await context.newsProvider.fetchSignals(normalized, fetchImpl);
+  } catch (error) {
+    providerWarnings.push(`News provider error: ${error instanceof Error ? error.message : 'unknown error'}`);
+  }
+  try {
+    socialSignals = await context.socialNetworkProvider.fetchSignals(normalized, fetchImpl);
+  } catch (error) {
+    providerWarnings.push(`Social provider error: ${error instanceof Error ? error.message : 'unknown error'}`);
+  }
+
   let providerResponse: PriceProviderResponse | null = null;
   try {
     providerResponse = await context.tickerPriceProvider.fetchPrice(normalized, fetchImpl) as PriceProviderResponse;
@@ -75,7 +59,9 @@ const getCurrentTickerPrice = async (
     providerWarnings.push(`Price unavailable from ${context.tickerPriceProvider.id}.`);
   }
   const currentPrice = providerResponse?.Price ?? 0;
-  const currentPriceChange = providerResponse?.ChangePercentage ?? 0 
+  const currentPriceChange = providerResponse?.ChangePercentage ?? 0;
+  const sentimentNewsScore = context.sentimentNewsEngine.score(newsSignals);
+  const sentimentSocialScore = context.socialNetworkEngine.score(socialSignals);
 
   return {
     id: uid(),
@@ -83,7 +69,9 @@ const getCurrentTickerPrice = async (
     currentPrice,
     changes: currentPriceChange,
     alerts: [],
-    providerWarnings
+    providerWarnings,
+    sentimentNewsScore,
+    sentimentSocialScore
   };
 };
 
@@ -140,7 +128,7 @@ export const addTicker = async (
 
 export const addAlert = (
   ticker: Ticker,
-  direction: 'above' | 'below',
+  direction: AlertDirection,
   threshold: number
 ): Ticker => ({
   ...ticker,
