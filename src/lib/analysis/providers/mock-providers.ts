@@ -2,14 +2,30 @@
  * Dedicated mock/random providers used by the default mock analysis context.
  * Centralizes synthetic spot prices and headline signals for offline development.
  */
+import { resolve } from '$app/paths';
+import type { PriceProviderResponse } from '../../../model/providers/price-provider-response';
 import type { NewsProvider, NewsSignal, TickerPriceProvider } from '../contracts';
 
 const symbolSeed = (symbol: string) => [...symbol.toUpperCase()].reduce((acc, char) => acc + char.charCodeAt(0), 0);
 
-export const anchorPrice = (symbol: string) => {
-  const sum = symbolSeed(symbol);
-  return Number((45 + (sum % 200) + (sum % 13) * 0.8).toFixed(2));
+export const anchorPrice = async (
+  symbol: string,
+  fetchImpl: typeof fetch,
+  quoteProxyUrlOverride = ''
+): Promise<PriceProviderResponse | null> => {
+  const sum = symbolSeed(symbol) + Date.now() % 1000000; // Add time-based variability for more dynamic mock prices
+  return Promise.resolve(
+        {
+          Ticker: symbol.toUpperCase(),
+          Name: symbol.toUpperCase(),
+          Price: Number((45 + (sum % 200) + (sum % 13) * 0.8).toFixed(2)),
+          ChangeAmount: Number(((sum % 5) - 2.5).toFixed(2)),  
+          ChangePercentage: Number((((sum % 5) - 2.5) / (45 + (sum % 200)) * 100).toFixed(2))
+        } satisfies PriceProviderResponse
+      );
+    
 };
+
 
 export const buildMockSignals = (symbol: string): NewsSignal[] => {
   const seed = symbolSeed(symbol);
@@ -37,7 +53,7 @@ export const mockTickerPriceProvider: TickerPriceProvider = {
   id: 'mock-random-price',
   name: 'Mock Random Price Provider',
   async fetchPrice(symbol: string) {
-    return anchorPrice(symbol);
+    return anchorPrice(symbol, fetch);
   }
 };
 
