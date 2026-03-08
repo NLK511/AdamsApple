@@ -20,7 +20,7 @@
     type PriceNotification,
     type Ticker,
     type Watchlist,
-  } from "$lib/trading";
+  } from "$lib/trading/index";
 
   const STORAGE_KEY = "trade-desk-watchlists-v1";
   const NOTIFICATION_STORAGE_KEY = "trade-desk-notifications-v1";
