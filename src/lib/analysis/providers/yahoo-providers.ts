@@ -44,13 +44,11 @@ const fetchYahooSignals = async (
   fetchImpl: typeof fetch,
   yahooSearchProxyUrlOverride: string = yahooSearchProxyUrl
 ): Promise<NewsSignal[]> => {
-  console.log(`Fetching Yahoo signals for ${symbol} from proxy URL: ${yahooSearchProxyUrlOverride}`);
   const url = new URL(yahooSearchProxyUrlOverride, 'http://local.proxy');
   url.searchParams.set('q', symbol.toUpperCase());
   url.searchParams.set('newsCount', '8');
 
   const response = await fetchImpl(`${url.pathname}${url.search}`);
-  console.log(`Yahoo search response for ${symbol}: ${response.status} ${response.statusText}`);
   if (!response.ok) return [];
 
   const payload = await response.json();
@@ -64,16 +62,15 @@ const fetchYahooSignals = async (
       const link = String(item?.link ?? '').trim();
 
       if (!link) {
-        return { source, signal: title, confidence: 0.6 } satisfies NewsSignal;
+        throw new Error(`Missing link for news item with title "${title}"`);
       }
 
       try {
-        console.log(`Fetching article for signal analysis: ${link}`);
         const analyzed = await readArticleSignal(link, title, fetchImpl);
-        console.log(`Analyzed signal for ${link}: ${analyzed.signal} (confidence: ${analyzed.confidence})`);
+        console.log(`Analyzed signal for ${link} score: ${analyzed.confidence})`);
         return { source, signal: analyzed.signal, confidence: analyzed.confidence } satisfies NewsSignal;
       } catch {
-        return { source, signal: title, confidence: 0.6 } satisfies NewsSignal;
+        throw new Error(`Failed to fetch or analyze article at ${link}`);
       }
     })
   );
@@ -86,7 +83,7 @@ export const yahooNewsProvider: NewsProvider = {
   name: 'Yahoo Financial News Provider',
   async fetchSignals(symbol, fetchImpl) {
     const signals = await fetchYahooSignals(symbol, fetchImpl);
-    return signals.filter((signal) => signal.source !== 'X');
+    return signals;
   }
 };
 

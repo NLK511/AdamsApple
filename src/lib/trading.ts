@@ -24,7 +24,6 @@ const getCurrentTickerPrice = async (
   contextId:string,
   fetchImpl: typeof fetch = fetch
 ): Promise<Ticker> => {
-  console.log(`Getting current ticker price for ${symbol} in context ${contextId}`);
   const normalized = symbol.toUpperCase();
   const context = getAnalysisContext(contextId);
   const providerWarnings: string[] = [];
@@ -33,7 +32,6 @@ const getCurrentTickerPrice = async (
   let socialSignals: NewsSignal[] = [];
   try {
     newsSignals = await context.newsProvider.fetchSignals(normalized, fetchImpl);
-    console.log(`Fetched ${newsSignals.length} news signals for ${normalized} from provider ${context.newsProvider.id}.`);
   } catch (error) {
     console.error(`News provider error for ${normalized} from provider ${context.newsProvider.id}:`, error instanceof Error ? error.message : error);
     providerWarnings.push(`News provider error: ${error instanceof Error ? error.message : 'unknown error'}`);

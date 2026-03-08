@@ -10,7 +10,7 @@ import {
 import { tickerPriceProvider } from './providers/default-providers';
 import { yahooNewsProvider, yahooSocialNetworkProvider } from './providers/yahoo-providers';
 import { mockNewsProvider, mockSocialNetworkProvider, mockTickerPriceProvider } from './providers/mock-providers';
-import { newsSentimentEngine, socialNetworkSentimentEngine } from './sentiment/source-sentiment-engine';
+import { createSourceSentimentEngine } from './sentiment/source-sentiment-engine';
 
 export const analysisContexts: AnalysisContext[] = [
   {
@@ -20,8 +20,14 @@ export const analysisContexts: AnalysisContext[] = [
     newsProvider: mockNewsProvider,
     tickerPriceProvider: mockTickerPriceProvider,
     socialNetworkProvider: mockSocialNetworkProvider,
-    sentimentNewsEngine: newsSentimentEngine,
-    socialNetworkEngine: socialNetworkSentimentEngine,
+    sentimentNewsEngine: createSourceSentimentEngine(
+      'mock-news-sentiment',
+      'Mock News Sentiment'
+    ),
+    socialNetworkEngine: createSourceSentimentEngine(
+      'mock-social-sentiment',
+      'Mock Social Sentiment'
+    ),
     fundamentalModels: defaultFundamentalModels,
     entryPointModels: defaultEntryPointModels
   },
@@ -32,8 +38,14 @@ export const analysisContexts: AnalysisContext[] = [
     newsProvider: yahooNewsProvider,
     tickerPriceProvider: tickerPriceProvider,
     socialNetworkProvider: yahooSocialNetworkProvider,
-    sentimentNewsEngine: newsSentimentEngine,
-    socialNetworkEngine: socialNetworkSentimentEngine,
+    sentimentNewsEngine: createSourceSentimentEngine(
+      'yahoo-news-sentiment',
+      'Yahoo News Sentiment'
+    ),
+    socialNetworkEngine: createSourceSentimentEngine(
+      'yahoo-social-sentiment',
+      'Yahoo Social Sentiment'
+    ),
     fundamentalModels: defaultFundamentalModels,
     entryPointModels: defaultEntryPointModels
   }

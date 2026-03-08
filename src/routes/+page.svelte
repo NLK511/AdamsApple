@@ -64,7 +64,10 @@
     refreshHandle = setInterval(async () => {
       if (refreshing) return;
       refreshing = true;
-      watchlists = await hydrateWatchlistsForContext(watchlists, activeContextId);
+      watchlists = await hydrateWatchlistsForContext(
+        watchlists,
+        activeContextId,
+      );
       const result = tickWatchlistsWithNotifications(watchlists);
       watchlists = result.watchlists;
       if (result.notifications.length > 0) {
@@ -476,7 +479,11 @@
                     class:down={ticker.changes < 0}
                     >{signed.format(ticker.changes)}%</td
                   >
-                  <td>{ticker.sentimentNewsScore.toFixed(1)} / {ticker.sentimentSocialScore.toFixed(1)}</td>
+                  <td
+                    >{ticker.sentimentNewsScore.toFixed(1)} / {ticker.sentimentSocialScore.toFixed(
+                      1,
+                    )}</td
+                  >
                   <td>
                     <div class="alerts">
                       {#if ticker.alerts.length === 0}
