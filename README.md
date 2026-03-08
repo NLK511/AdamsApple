@@ -63,6 +63,8 @@ All external Yahoo API calls are proxied through SvelteKit endpoints so browser 
 
 - `GET /api/providers/yahoo/quote?symbols=<TICKER>`
 - `GET /api/providers/yahoo/search?q=<TICKER>&newsCount=8`
+- `GET /api/providers/yahoo/article?url=<ARTICLE_URL>`
+- `GET /api/providers/x/search?q=<QUERY>&max_results=10`
 
 The live provider module (`src/lib/analysis/providers/live-providers.ts`) calls these internal endpoints by default.
 
@@ -385,3 +387,23 @@ Clicking the icon opens the warning list so you can inspect current fetch/provid
 
 
 For live contexts, failed provider refreshes now retain the latest successful provider value from cache (or `0` when no successful fetch exists yet), and warnings are surfaced in the UI.
+
+
+### X (Twitter) provider auth
+
+Live social sentiment uses the X recent-search proxy endpoint and requires a bearer token:
+
+- Environment variable: `X_BEARER_TOKEN`
+- Used by server route: `src/routes/api/providers/x/search/+server.ts`
+
+When no token is configured, the endpoint returns an empty result and provider fallback signals are used.
+
+### Sentiment rationale drill-down page
+
+On the dashboard ticker row, both sentiment scores are clickable:
+
+- News score → `/ticker/<SYMBOL>/sentiment?context=<CONTEXT>#news`
+- Social score → `/ticker/<SYMBOL>/sentiment?context=<CONTEXT>#social`
+
+The sentiment page shows raw signals, matched positive/negative tokens, per-signal weighted contribution, and rationale text for the final score.
+

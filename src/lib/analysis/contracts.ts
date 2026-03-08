@@ -64,6 +64,12 @@ export interface NewsProvider {
   fetchSignals(symbol: string, fetchImpl: typeof fetch): Promise<NewsSignal[]>;
 }
 
+export interface SocialNetworkProvider {
+  id: string;
+  name: string;
+  fetchSignals(symbol: string, fetchImpl: typeof fetch): Promise<NewsSignal[]>;
+}
+
 export interface TickerPriceProvider {
   id: string;
   name: string;
@@ -82,12 +88,22 @@ export interface SentimentEngine {
   build(symbol: string, signals: NewsSignal[]): SentimentDigest;
 }
 
+export interface SentimentScoreEngine {
+  id: string;
+  name: string;
+  score(signals: NewsSignal[]): number;
+}
+
 export interface AnalysisContext {
   id: string;
   name: string;
+  refreshIntervalMs: number;
   newsProvider: NewsProvider;
   tickerPriceProvider: TickerPriceProvider;
   sentimentEngine: SentimentEngine;
+  socialNetworkProvider: SocialNetworkProvider;
+  sentimentNewsEngine: SentimentScoreEngine;
+  socialNetworkEngine: SentimentScoreEngine;
   fundamentalModels: FundamentalModel[];
   entryPointModels: EntryPointModel[];
 }
