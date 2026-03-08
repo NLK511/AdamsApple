@@ -3,6 +3,7 @@
  * Exposes default_mock and default_live presets with pluggable extension points.
  */
 import type { AnalysisContext } from './contracts';
+import { createAnalysisContext, validateAnalysisContexts } from './context-builder';
 import {
   defaultEntryPointModels,
   defaultFundamentalModels
@@ -13,7 +14,7 @@ import { mockNewsProvider, mockSocialNetworkProvider, mockTickerPriceProvider } 
 import { newsSentimentEngine, socialNetworkSentimentEngine } from './sentiment/source-sentiment-engine';
 
 export const analysisContexts: AnalysisContext[] = [
-  {
+  createAnalysisContext({
     id: 'default_mock',
     name: 'Default Mock Context',
     refreshIntervalMs: 5000,
@@ -24,8 +25,8 @@ export const analysisContexts: AnalysisContext[] = [
     socialNetworkEngine: socialNetworkSentimentEngine,
     fundamentalModels: defaultFundamentalModels,
     entryPointModels: defaultEntryPointModels
-  },
-  {
+  }),
+  createAnalysisContext({
     id: 'default_live',
     name: 'Default Live Context ',
     refreshIntervalMs: 30000,
@@ -36,8 +37,10 @@ export const analysisContexts: AnalysisContext[] = [
     socialNetworkEngine: socialNetworkSentimentEngine,
     fundamentalModels: defaultFundamentalModels,
     entryPointModels: defaultEntryPointModels
-  }
+  })
 ];
+
+validateAnalysisContexts(analysisContexts);
 
 export const getAnalysisContext = (contextId: string | undefined): AnalysisContext =>
   analysisContexts.find((context) => context.id === contextId) ?? analysisContexts[0];
