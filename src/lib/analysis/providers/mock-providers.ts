@@ -4,7 +4,8 @@
  */
 import type { PriceProviderResponse } from '../../../model/providers/price-provider-response';
 import type { NewsProvider, NewsSignal, SocialNetworkProvider, TickerPriceProvider } from '../contracts';
-import { scoreSignal } from '../sentiment/scoring';
+import { buildArticleSignalPipeline, normalizeListFetch } from './shared/article-signal-pipeline';
+import type { NormalizedProviderNewsItem } from './shared/types';
 
 const symbolSeed = (symbol: string) => [...symbol.toUpperCase()].reduce((acc, char) => acc + char.charCodeAt(0), 0);
 
@@ -30,20 +31,35 @@ const sampleArticles = {
     'Social posts flag downgrade chatter, lawsuit worries, and weak trend signals with users reducing exposure.'
 } as const;
 
-const openMockArticle = async (link: string, title: string): Promise<{ signal: string; confidence: number }> => {
-  const text = sampleArticles[link as keyof typeof sampleArticles] ?? title;
-  const score = scoreSignal(text);
-  return {
-    signal: text,
-    confidence: Math.min(0.95, Math.max(0.5, 0.55 + Math.abs(score) * 0.08))
-  };
+const buildMockFinancialItems = (symbol: string): NormalizedProviderNewsItem[] => {
+  const tone = symbolSeed(symbol) % 2;
+  return [
+    {
+      publisher: 'Financial Times',
+      title: `${symbol} analysts review quality of earnings and guidance updates`,
+      link: tone === 0 ? 'https://mock.local/news/earnings-beat' : 'https://mock.local/news/margin-pressure'
+    }
+  ];
 };
+
+const buildMockSocialItems = (symbol: string): NormalizedProviderNewsItem[] => {
+  const tone = symbolSeed(symbol) % 2;
+  return [
+    {
+      publisher: 'X',
+      title: `${symbol} social thread sentiment pulse`,
+      link: tone === 0 ? 'https://mock.local/social/bull-thread' : 'https://mock.local/social/bear-thread'
+    }
+  ];
+};
+
+const fetchMockArticle = async (link: string, title: string): Promise<string | null> =>
+  sampleArticles[link as keyof typeof sampleArticles] ?? title;
 
 export const mockTickerPriceProvider: TickerPriceProvider = {
   id: 'mock-random-price',
   name: 'Mock Random Price Provider',
   async fetchPrice(symbol: string) {
-    return anchorPrice(symbol);
     return anchorPrice(symbol);
   }
 };
@@ -51,43 +67,31 @@ export const mockTickerPriceProvider: TickerPriceProvider = {
 export const mockNewsProvider: NewsProvider = {
   id: 'mock-headlines-news',
   name: 'Mock Financial News Provider',
-  async fetchSignals(symbol: string): Promise<NewsSignal[]> {
-    const tone = symbolSeed(symbol) % 2;
-    const items = [
-      {
-        source: 'Financial Times' as const,
-        title: `${symbol} analysts review quality of earnings and guidance updates`,
-        link: tone === 0 ? 'https://mock.local/news/earnings-beat' : 'https://mock.local/news/margin-pressure'
-      }
-    ];
-
-    return Promise.all(
-      items.map(async (item) => {
-        const analyzed = await openMockArticle(item.link, item.title);
-        return { source: item.source, signal: analyzed.signal, confidence: analyzed.confidence } satisfies NewsSignal;
-      })
-    );
+  async fetchSignals(symbol: string, fetchImpl): Promise<NewsSignal[]> {
+    return buildArticleSignalPipeline({
+      symbol,
+      fetchImpl,
+      fetchListPayload: async (currentSymbol) => ({ items: buildMockFinancialItems(currentSymbol) }),
+      normalizeItems: (payload) => normalizeListFetch((payload as { items?: unknown })?.items),
+      fetchArticle: (link, title) => fetchMockArticle(link, title),
+      normalizeArticleText: (content) => content.trim(),
+      classifySource: () => 'Financial Times'
+    });
   }
 };
 
 export const mockSocialNetworkProvider: SocialNetworkProvider = {
   id: 'mock-headlines-x',
   name: 'Mock X Provider',
-  async fetchSignals(symbol: string): Promise<NewsSignal[]> {
-    const tone = symbolSeed(symbol) % 2;
-    const items = [
-      {
-        source: 'X' as const,
-        title: `${symbol} social thread sentiment pulse`,
-        link: tone === 0 ? 'https://mock.local/social/bull-thread' : 'https://mock.local/social/bear-thread'
-      }
-    ];
-
-    return Promise.all(
-      items.map(async (item) => {
-        const analyzed = await openMockArticle(item.link, item.title);
-        return { source: item.source, signal: analyzed.signal, confidence: analyzed.confidence } satisfies NewsSignal;
-      })
-    );
+  async fetchSignals(symbol: string, fetchImpl): Promise<NewsSignal[]> {
+    return buildArticleSignalPipeline({
+      symbol,
+      fetchImpl,
+      fetchListPayload: async (currentSymbol) => ({ items: buildMockSocialItems(currentSymbol) }),
+      normalizeItems: (payload) => normalizeListFetch((payload as { items?: unknown })?.items),
+      fetchArticle: (link, title) => fetchMockArticle(link, title),
+      normalizeArticleText: (content) => content.trim(),
+      classifySource: () => 'X'
+    });
   }
 };
