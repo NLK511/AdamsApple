@@ -2,84 +2,60 @@
  * Live provider adapters using SvelteKit proxy endpoints for external Yahoo APIs.
  * Ensures browser consumers avoid direct cross-origin requests and CORS failures.
  */
-import { scoreSignal } from '../sentiment/scoring';
-import type { NewsProvider, NewsSignal, SocialNetworkProvider } from '../contracts';
+import type { NewsProvider, SocialNetworkProvider } from '../contracts';
+import {
+  buildArticleSignalPipeline,
+  extractTextFromHtml,
+  normalizeListFetch
+} from './shared/article-signal-pipeline';
+import { classifyProviderSource } from './shared/source-classifier';
+import { providerLog } from './shared/provider-log';
 
 const yahooSearchProxyUrl = '/api/providers/yahoo/search';
 const yahooArticleProxyUrl = '/api/providers/yahoo/article';
 
-const parseSource = (publisher: string): NewsSignal['source'] =>
-  /financial\s*times|reuters|bloomberg|wsj|marketwatch|cnbc/i.test(publisher)
-    ? 'Financial Times'
-    : 'X';
+const fetchYahooListPayload = async (
+  symbol: string,
+  fetchImpl: typeof fetch,
+  yahooSearchProxyUrlOverride: string = yahooSearchProxyUrl
+): Promise<unknown> => {
+  const url = new URL(yahooSearchProxyUrlOverride, 'http://local.proxy');
+  url.searchParams.set('q', symbol.toUpperCase());
+  url.searchParams.set('newsCount', '8');
 
-const stripHtml = (html: string) =>
-  html
-    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
-    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  providerLog(`Fetching Yahoo signals for ${symbol} from proxy URL: ${url.pathname}${url.search}`);
+  const response = await fetchImpl(`${url.pathname}${url.search}`);
+  providerLog(`Yahoo search response for ${symbol}: ${response.status} ${response.statusText}`);
 
-const scoreToConfidence = (score: number) => Math.min(0.95, Math.max(0.5, 0.55 + Math.abs(score) * 0.08));
+  if (!response.ok) {
+    return { news: [] };
+  }
 
-const readArticleSignal = async (link: string, title: string, fetchImpl: typeof fetch): Promise<{ signal: string; confidence: number }> => {
+  return response.json();
+};
+
+const fetchYahooArticle = async (link: string, title: string, fetchImpl: typeof fetch): Promise<string | null> => {
   const url = new URL(yahooArticleProxyUrl, 'http://local.proxy');
   url.searchParams.set('url', link);
 
   const response = await fetchImpl(`${url.pathname}${url.search}`);
   if (!response.ok) {
-    return { signal: title, confidence: 0.6 };
+    return title;
   }
 
-  const html = await response.text();
-  const text = stripHtml(html).slice(0, 900);
-  const signalText = text.length > 40 ? text : title;
-  const score = scoreSignal(signalText);
-  return { signal: signalText, confidence: scoreToConfidence(score) };
+  return response.text();
 };
 
-const fetchYahooSignals = async (
-  symbol: string,
-  fetchImpl: typeof fetch,
-  yahooSearchProxyUrlOverride: string = yahooSearchProxyUrl
-): Promise<NewsSignal[]> => {
-  console.log(`Fetching Yahoo signals for ${symbol} from proxy URL: ${yahooSearchProxyUrlOverride}`);
-  const url = new URL(yahooSearchProxyUrlOverride, 'http://local.proxy');
-  url.searchParams.set('q', symbol.toUpperCase());
-  url.searchParams.set('newsCount', '8');
-
-  const response = await fetchImpl(`${url.pathname}${url.search}`);
-  console.log(`Yahoo search response for ${symbol}: ${response.status} ${response.statusText}`);
-  if (!response.ok) return [];
-
-  const payload = await response.json();
-  const news = Array.isArray(payload?.news) ? payload.news : [];
-
-  const signals = await Promise.all(
-    news.slice(0, 6).map(async (item: { title?: string; publisher?: string; link?: string }) => {
-      const title = String(item?.title ?? '').trim();
-      if (!title) return null;
-      const source = parseSource(String(item?.publisher ?? 'X'));
-      const link = String(item?.link ?? '').trim();
-
-      if (!link) {
-        return { source, signal: title, confidence: 0.6 } satisfies NewsSignal;
-      }
-
-      try {
-        console.log(`Fetching article for signal analysis: ${link}`);
-        const analyzed = await readArticleSignal(link, title, fetchImpl);
-        console.log(`Analyzed signal for ${link}: ${analyzed.signal} (confidence: ${analyzed.confidence})`);
-        return { source, signal: analyzed.signal, confidence: analyzed.confidence } satisfies NewsSignal;
-      } catch {
-        return { source, signal: title, confidence: 0.6 } satisfies NewsSignal;
-      }
-    })
-  );
-
-  return signals.filter((row: NewsSignal | null): row is NewsSignal => row !== null);
-};
+const fetchYahooSignals = async (symbol: string, fetchImpl: typeof fetch) =>
+  buildArticleSignalPipeline({
+    symbol,
+    fetchImpl,
+    fetchListPayload: fetchYahooListPayload,
+    normalizeItems: (payload) => normalizeListFetch((payload as { news?: unknown })?.news),
+    fetchArticle: fetchYahooArticle,
+    normalizeArticleText: extractTextFromHtml,
+    classifySource: (item) => classifyProviderSource(item.publisher)
+  });
 
 export const yahooNewsProvider: NewsProvider = {
   id: 'yahoo-news-ft',
