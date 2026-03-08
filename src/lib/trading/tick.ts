@@ -1,6 +1,6 @@
-import type { PriceNotification } from '../analysis/model/notifications/price-notification';
-import type { TickResult } from '../analysis/model/ticks/tick-result';
-import type { Watchlist } from '../analysis/model/watchlists/watchlist';
+import type { PriceNotification } from './model/notifications/price-notification';
+import type { TickResult } from './model/ticks/tick-result';
+import type { Watchlist } from './model/watchlists/watchlist';
 import { createNotification } from './notifications';
 
 export const tickWatchlistsWithNotifications = (

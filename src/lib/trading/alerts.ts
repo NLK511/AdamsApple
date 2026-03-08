@@ -1,5 +1,5 @@
-import type { AlertDirection } from '../analysis/model/alerts/alert-direction';
-import type { Ticker } from '../analysis/model/tickers/ticker';
+import type { AlertDirection } from './model/alerts/alert-direction';
+import type { Ticker } from './model/tickers/ticker';
 import { uid } from './internal/uid';
 
 export const addAlert = (

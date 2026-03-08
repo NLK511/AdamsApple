@@ -1,7 +1,7 @@
 import type { PriceProviderResponse } from '../../model/providers/price-provider-response';
 import type { NewsSignal } from '../analysis/contracts';
 import { getAnalysisContext } from '../analysis/contexts';
-import type { Ticker } from '../analysis/model/tickers/ticker';
+import type { Ticker } from './model/tickers/ticker';
 import { uid } from './internal/uid';
 
 export const getCurrentTickerPrice = async (

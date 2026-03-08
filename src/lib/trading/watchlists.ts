@@ -1,4 +1,4 @@
-import type { Watchlist } from '../analysis/model/watchlists/watchlist';
+import type { Watchlist } from './model/watchlists/watchlist';
 import { DEFAULT_WATCHLIST_SYMBOLS } from './internal/constants';
 import { uid } from './internal/uid';
 import { getCurrentTickerPrice, refreshTickerFromContext } from './ticker-loader';
