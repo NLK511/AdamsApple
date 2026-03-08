@@ -17,10 +17,10 @@
     tickWatchlistsWithNotifications,
     toggleAlert,
     unreadNotificationCount,
-    type PriceNotification,
-    type Ticker,
-    type Watchlist,
   } from "$lib/trading/index";
+  import type { PriceNotification } from "$lib/trading/model/notifications/price-notification";
+  import type { Ticker } from "$lib/trading/model/tickers/ticker";
+  import type { Watchlist } from "$lib/trading/model/watchlists/watchlist";
 
   const STORAGE_KEY = "trade-desk-watchlists-v1";
   const NOTIFICATION_STORAGE_KEY = "trade-desk-notifications-v1";

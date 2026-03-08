@@ -1,7 +1,7 @@
-import type { AlertRule } from '../analysis/model/alerts/alert-rule';
-import type { PriceNotification } from '../analysis/model/notifications/price-notification';
-import type { Ticker } from '../analysis/model/tickers/ticker';
-import type { Watchlist } from '../analysis/model/watchlists/watchlist';
+import type { AlertRule } from './model/alerts/alert-rule';
+import type { PriceNotification } from './model/notifications/price-notification';
+import type { Ticker } from './model/tickers/ticker';
+import type { Watchlist } from './model/watchlists/watchlist';
 import { uid } from './internal/uid';
 
 export const createNotification = (
